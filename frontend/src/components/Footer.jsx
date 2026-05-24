@@ -1,23 +1,32 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaFacebookF, FaInstagram, FaLinkedinIn, FaWhatsapp, FaPhone, FaEnvelope, FaMapMarkerAlt, FaArrowRight } from 'react-icons/fa';
+import { FaFacebookF, FaInstagram, FaLinkedinIn, FaWhatsapp, FaPhone, FaEnvelope, FaMapMarkerAlt, FaArrowRight, FaUser } from 'react-icons/fa';
 import { SiTiktok } from 'react-icons/si';
 import { useTranslation } from 'react-i18next';
 import Logo from './Logo';
 import { toast } from 'react-toastify';
+import api from '../api';
 
 const Footer = () => {
   const { t } = useTranslation();
-  const [nlEmail, setNlEmail] = useState('');
+  const [nlName, setNlName] = useState('');
+  const [nlPhone, setNlPhone] = useState('');
   const [nlDone, setNlDone] = useState(false);
 
-  const handleNewsletter = (e) => {
+  const handleNewsletter = async (e) => {
     e.preventDefault();
-    if (!nlEmail.trim()) return;
-    const msg = encodeURIComponent(`Hi Meditrust Nepal! I'd like to subscribe to product updates and offers. My email: ${nlEmail}`);
-    window.open(`https://wa.me/9779818100515?text=${msg}`, '_blank');
-    setNlDone(true);
-    toast.success('Thanks! We\'ll add you to our updates list.');
+    if (!nlName.trim() || !nlPhone.trim()) return;
+    try {
+      // Save to database
+      await api.post('/notify/newsletter', { name: nlName, phone: nlPhone, source: 'footer_newsletter' });
+      // Redirect to WhatsApp
+      const msg = encodeURIComponent(`Hi Meditrust Nepal! I just subscribed to your newsletter. My name: ${nlName}, Phone: ${nlPhone}`);
+      window.open(`https://wa.me/9779818100515?text=${msg}`, '_blank');
+      setNlDone(true);
+      toast.success('Thanks! We\'ll add you to our updates list.');
+    } catch (err) {
+      toast.error('Failed to subscribe. Please try again.');
+    }
   };
 
   const quickLinks = [
@@ -50,14 +59,28 @@ const Footer = () => {
               <p className="text-white font-semibold">✅ Subscribed! We'll be in touch.</p>
             ) : (
               <form onSubmit={handleNewsletter} className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                <input
-                  type="email"
-                  value={nlEmail}
-                  onChange={e => setNlEmail(e.target.value)}
-                  placeholder="Your email address"
-                  required
-                  className="flex-1 w-full sm:w-72 px-4 py-3 rounded-[10px] text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
+                <div className="flex items-center gap-2 bg-white rounded-[10px] px-3 w-full sm:w-auto">
+                  <FaUser className="text-gray-400 text-sm" />
+                  <input
+                    type="text"
+                    value={nlName}
+                    onChange={e => setNlName(e.target.value)}
+                    placeholder="Your name"
+                    required
+                    className="flex-1 px-2 py-3 text-gray-900 text-sm focus:outline-none bg-transparent"
+                  />
+                </div>
+                <div className="flex items-center gap-2 bg-white rounded-[10px] px-3 w-full sm:w-auto">
+                  <FaPhone className="text-gray-400 text-sm" />
+                  <input
+                    type="tel"
+                    value={nlPhone}
+                    onChange={e => setNlPhone(e.target.value)}
+                    placeholder="Your phone number"
+                    required
+                    className="flex-1 px-2 py-3 text-gray-900 text-sm focus:outline-none bg-transparent"
+                  />
+                </div>
                 <button
                   type="submit"
                   className="bg-white text-brand-cyan px-6 py-3 rounded-[10px] hover:bg-gray-50 transition-colors font-semibold whitespace-nowrap text-sm flex items-center gap-2"
