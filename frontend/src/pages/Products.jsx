@@ -14,6 +14,12 @@ import { useWishlist } from '../contexts/WishlistContext';
 import { SidebarBanner, InlineBanner } from '../components/PromoBanner';
 import { optimizeCloudinaryUrl, cloudinaryPlaceholder } from '../utils/cloudinary';
 
+// Strip HTML tags for product listing display
+const stripHtml = (html) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+};
+
 const BlurImage = ({ src, alt, className }) => {
   const [loaded, setLoaded] = useState(false);
   const placeholder = cloudinaryPlaceholder(src);
@@ -639,7 +645,7 @@ const Products = () => {
                         <div className="p-3 sm:p-5 flex flex-col flex-1">
                           <h3 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors text-sm sm:text-base line-clamp-2 leading-snug">{product.name}</h3>
                           {product.description && (
-                            <p className="text-gray-500 text-xs sm:text-sm line-clamp-1 mt-1 sm:mt-2">{product.description}</p>
+                            <p className="text-gray-500 text-xs sm:text-sm line-clamp-1 mt-1 sm:mt-2">{stripHtml(product.description)}</p>
                           )}
                           {product.price && (
                             <div className="mt-1 sm:mt-2">
@@ -707,7 +713,7 @@ const Products = () => {
                           {product.category && <span className="text-primary-600 text-xs font-medium">{product.category}</span>}
                           <h3 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors mt-1">{product.name}</h3>
                           {product.description && (
-                            <p className="text-gray-500 text-sm line-clamp-2 mt-1">{product.description}</p>
+                            <p className="text-gray-500 text-sm line-clamp-2 mt-1">{stripHtml(product.description)}</p>
                           )}
                           {product.price && (
                             <div className="mt-2 flex items-center gap-2 flex-wrap">
