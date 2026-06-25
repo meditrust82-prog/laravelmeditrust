@@ -1,0 +1,1 @@
+function a(o,{width:e,height:r}={}){if(!o||typeof o!="string"||!o.includes("res.cloudinary.com"))return o;const n=["f_auto","q_auto"];return e&&n.push(`w_${e}`),r&&n.push(`h_${r}`),o.replace("/upload/",`/upload/${n.join(",")}/`)}function u(o){return!o||!o.includes("res.cloudinary.com")?null:o.replace("/upload/","/upload/w_20,q_10,e_blur:500,f_auto/")}export{u as c,a as o};

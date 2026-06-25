@@ -1,0 +1,13 @@
+{
+  "name": "meditrust",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd laravel-backend && php artisan serve --host=127.0.0.1 --port=8001",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "install:all": "composer install --working-dir=laravel-backend && npm install --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
