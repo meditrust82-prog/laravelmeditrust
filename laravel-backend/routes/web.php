@@ -3,10 +3,12 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SitemapController;
 use App\Http\Controllers\RenderController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\PageController;
 
-Route::get('/api/health', fn () => response()->json(['status' => 'ok', 'version' => 'v1']));
+Route::get('/health', [HealthController::class, 'index']);
+Route::get('/api/health', [HealthController::class, 'api']);
 Route::get('/sitemap.xml', [SitemapController::class, 'index']);
 Route::get('/robots.txt', [SitemapController::class, 'robots']);
 Route::get('/render', [RenderController::class, 'render']);
