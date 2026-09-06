@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\Blog;
 
 class SitemapController extends Controller
 {
@@ -11,6 +12,7 @@ class SitemapController extends Controller
         $site = env('APP_URL') ?: 'https://meditrustnepal.com';
         $today = now()->toDateString();
         $products = Product::select('slug', 'updated_at')->get();
+        $blogs = Blog::where('published', true)->select('slug', 'updated_at')->get();
 
         $urls = [];
         $static = [
@@ -30,6 +32,12 @@ class SitemapController extends Controller
             $updatedAt = $product->getRawOriginal('updated_at') ? \Illuminate\Support\Carbon::parse($product->getRawOriginal('updated_at')) : null;
             $lastmod = optional($updatedAt)?->toDateString() ?: $today;
             $urls[] = "<url><loc>{$site}/products/{$product->slug}</loc><lastmod>{$lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>";
+        }
+        foreach ($blogs as $blog) {
+            if (!$blog->slug) continue;
+            $updatedAt = $blog->getRawOriginal('updated_at') ? \Illuminate\Support\Carbon::parse($blog->getRawOriginal('updated_at')) : null;
+            $lastmod = optional($updatedAt)?->toDateString() ?: $today;
+            $urls[] = "<url><loc>{$site}/blog/{$blog->slug}</loc><lastmod>{$lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>";
         }
 
         $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n" . implode("\n", $urls) . "\n</urlset>";

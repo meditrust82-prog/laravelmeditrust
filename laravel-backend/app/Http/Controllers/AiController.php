@@ -29,6 +29,29 @@ class AiController extends Controller
         return $response->json();
     }
 
+    /** xAI Grok (OpenAI-compatible). Prefer XAI_API_KEY, fall back to GROK_API_KEY. */
+    protected function xaiCall(array $messages, int $maxTokens = 800, float $temperature = 0.5): ?array
+    {
+        $apiKey = env('XAI_API_KEY') ?: env('GROK_API_KEY');
+        if (!$apiKey) {
+            return null;
+        }
+
+        $model = env('GROK_MODEL', 'grok-2-latest');
+        $response = Http::withToken($apiKey)->post('https://api.x.ai/v1/chat/completions', [
+            'model' => $model,
+            'messages' => $messages,
+            'temperature' => $temperature,
+            'max_tokens' => $maxTokens,
+        ]);
+
+        if (!$response->successful()) {
+            return ['error' => $response->json('error.message') ?: 'Grok error'];
+        }
+
+        return $response->json();
+    }
+
     protected function productCatalog(): array
     {
         return Product::query()->limit(100)->get()->map(function ($p) {
@@ -188,6 +211,111 @@ class AiController extends Controller
         }
 
         return response()->json(['results' => $out ?: $results]);
+    }
+
+    /** Extract a JSON object from an AI response (strips markdown fences, handles prose). */
+    protected function extractJson(string $text): ?array
+    {
+        $text = trim($text);
+        $text = preg_replace('/^```(?:json)?\s*/i', '', $text);
+        $text = preg_replace('/\s*```$/', '', $text);
+        $text = trim($text);
+
+        $decoded = json_decode($text, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        if (preg_match('/\{[\s\S]*\}/', $text, $m)) {
+            $decoded = json_decode($m[0], true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Generate a full blog post (title, content, SEO, AEO, FAQs, author…) from a
+     * topic description, structured to match the Meditrust blog schema.
+     */
+    public function generateBlog(Request $req)
+    {
+        $data = $req->validate([
+            'prompt' => ['required', 'string', 'min:5'],
+            'tone' => ['nullable', 'string', 'max:120'],
+            'audience' => ['nullable', 'string', 'max:200'],
+        ]);
+
+        if (!env('GROQ_API_KEY') && !env('XAI_API_KEY') && !env('GROK_API_KEY')) {
+            return response()->json(['error' => 'AI service not configured (set XAI_API_KEY or GROQ_API_KEY)'], 503);
+        }
+
+        $tone = $data['tone'] ?? 'professional and helpful';
+        $audience = $data['audience'] ?? 'medical professionals and buyers in Nepal';
+
+        $system = <<<'SYS'
+You are an expert medical-equipment content writer for Meditrust Nepal, an eCommerce platform for medical equipment in Nepal.
+
+Given a topic description, write a complete, well-structured blog post. Return ONLY a valid JSON object (no markdown code fences, no commentary before or after) with EXACTLY these keys:
+
+{
+  "title": "compelling SEO title, 60 chars max",
+  "slug": "lowercase url slug",
+  "excerpt": "1-2 sentence summary, 155 chars max",
+  "content": "full article HTML using ONLY these tags: h2, h3, p, ul, ol, li, blockquote, strong, em. Do NOT use h1 or markdown. 800-1200 words, 3-6 h2 sections, include at least one h3 subsection under the first h2 and at least one bullet or numbered list.",
+  "category": "a short category name",
+  "tags": ["4-6 short tags"],
+  "metaTitle": "SEO title, 60 chars max",
+  "metaDesc": "meta description, 155 chars max",
+  "focusKeyword": "primary keyword phrase",
+  "secondaryKeywords": ["2-4 related keyword phrases"],
+  "searchIntent": "one of: informational, commercial, transactional, navigational",
+  "primaryQuestion": "the main question the article answers",
+  "directAnswer": "40-80 word direct answer suitable for a featured snippet",
+  "keyTakeaways": ["4-5 key takeaways"],
+  "faqs": [{"q": "question", "a": "answer"}],
+  "author": "Meditrust Nepal",
+  "authorCredentials": "short author credential line",
+  "authorBio": "1-2 sentence author bio",
+  "sources": [{"title": "source title", "url": "https://...", "publisher": "publisher name", "type": "guideline|study|standard"}]
+}
+
+Keep the content factual and general. Do not invent specific prices, stock, or unverifiable medical claims. Write in the requested tone for the requested audience.
+SYS;
+
+        $user = 'Topic: ' . $data['prompt']
+            . "\nTone: " . $tone
+            . "\nTarget audience: " . $audience;
+
+        $raw = $this->xaiCall([
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $user],
+        ], 4000, 0.7);
+
+        if ($raw === null) {
+            $raw = $this->groqCall([
+                ['role' => 'system', 'content' => $system],
+                ['role' => 'user', 'content' => $user],
+            ], 4000, 0.7);
+        }
+
+        if ($raw === null) {
+            return response()->json(['error' => 'AI service not configured'], 503);
+        }
+        if (isset($raw['error'])) {
+            return response()->json(['error' => $raw['error']], 500);
+        }
+
+        $text = $raw['choices'][0]['message']['content'] ?? '';
+        $parsed = $this->extractJson($text);
+
+        if (!$parsed) {
+            return response()->json(['error' => 'AI returned an unparseable response', 'raw' => $text], 422);
+        }
+
+        return response()->json($parsed);
     }
 
     public function handle(Request $req, $any)

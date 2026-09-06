@@ -110,7 +110,8 @@ const Blog = () => {
                       {post.category && (
                         <span className="bg-primary-50 text-primary-600 px-2 py-0.5 rounded font-medium">{post.category}</span>
                       )}
-                      <span className="flex items-center"><FaCalendarAlt className="mr-1" />{formatDate(post.createdAt)}</span>
+                      <span className="flex items-center"><FaCalendarAlt className="mr-1" />{formatDate(post.updatedAt || post.createdAt)}</span>
+                      {post.readingTime ? <span className="text-gray-400">{post.readingTime} min read</span> : null}
                     </div>
                     <h3 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2 mb-2">{post.title}</h3>
                     <p className="text-gray-500 text-sm line-clamp-2">{post.excerpt}</p>

@@ -307,3 +307,109 @@ select {
   transform: scale(1.06);
   filter: brightness(1.08) drop-shadow(0 4px 12px rgba(6, 182, 212, 0.35));
 }
+
+/* ── Rich text content blocks (editor + blog frontend) ───────── */
+
+/* Callouts: key-takeaway / warning / notice / cta */
+.callout {
+  border: 1px solid #e5e7eb;
+  border-left-width: 4px;
+  border-radius: 0.6rem;
+  padding: 0.85rem 1rem;
+  margin: 1.1rem 0;
+}
+.callout::before {
+  display: block;
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+}
+.callout[data-callout="key-takeaway"] { background: #f0fdf4; border-color: #bbf7d0; border-left-color: #22c55e; }
+.callout[data-callout="key-takeaway"]::before { content: "✅ Key Takeaway"; color: #15803d; }
+.callout[data-callout="warning"] { background: #fffbeb; border-color: #fde68a; border-left-color: #f59e0b; }
+.callout[data-callout="warning"]::before { content: "⚠️ Warning"; color: #b45309; }
+.callout[data-callout="notice"] { background: #eff6ff; border-color: #bfdbfe; border-left-color: #3b82f6; }
+.callout[data-callout="notice"]::before { content: "ℹ️ Note"; color: #1d4ed8; }
+.callout[data-callout="cta"] {
+  background: linear-gradient(135deg, #06b6d4 0%, #7cc62d 100%);
+  border: none; color: #ffffff;
+}
+.callout[data-callout="cta"]::before { content: "👉 Action"; color: rgba(255,255,255,0.92); }
+.callout[data-callout="cta"] p,
+.callout[data-callout="cta"] a { color: #ffffff; }
+
+/* Step-by-step */
+ol.steps { list-style: none; counter-reset: step; padding-left: 0; margin: 1.1rem 0; }
+ol.steps li.step {
+  counter-increment: step;
+  position: relative;
+  padding-left: 2.6rem;
+  margin-bottom: 0.85rem;
+  list-style: none;
+}
+ol.steps li.step::before {
+  content: counter(step);
+  position: absolute; left: 0; top: 0;
+  width: 1.8rem; height: 1.8rem;
+  background: #06b6d4; color: #ffffff;
+  border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem;
+}
+
+/* Figure (image + caption) */
+.figure-block { margin: 1.25rem 0; text-align: center; }
+.figure-block img { max-width: 100%; border-radius: 0.75rem; margin: 0 auto; display: block; }
+.figure-caption { font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem; }
+
+/* Video embed (responsive) */
+.video-embed { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 0.75rem; margin: 1.25rem 0; }
+.video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* Product recommendation card */
+.product-rec {
+  display: flex; gap: 1rem; align-items: center;
+  border: 1px solid #e5e7eb; border-radius: 0.75rem;
+  padding: 0.75rem; margin: 1.25rem 0; background: #ffffff;
+}
+.product-rec img { width: 72px; height: 72px; object-fit: cover; border-radius: 0.5rem; flex-shrink: 0; }
+.product-rec-img--placeholder { width: 72px; height: 72px; border-radius: 0.5rem; background: #f3f4f6; flex-shrink: 0; }
+.product-rec-body { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.product-rec-name { font-weight: 600; color: #111827; }
+.product-rec-price { color: #16a34a; font-weight: 600; }
+
+/* Tables (editor + frontend) */
+.prose .tableWrapper { overflow-x: auto; }
+.prose table { border-collapse: collapse; width: 100%; margin: 1.1rem 0; }
+.prose th, .prose td {
+  border: 1px solid #d1d5db;
+  padding: 0.55rem 0.8rem;
+  vertical-align: top;
+  text-align: left;
+  position: relative;
+  min-width: 3rem;
+}
+.prose th { background: #f9fafb; font-weight: 600; }
+.prose .selectedCell::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(6, 182, 212, 0.12); pointer-events: none;
+}
+.prose .column-resize-handle {
+  position: absolute; right: -2px; top: 0; bottom: 0; width: 4px;
+  background: #06b6d4; opacity: 0.6;
+}
+
+/* Pros & Cons two-column */
+.proscons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.1rem 0; }
+.proscons-col { border: 1px solid #e5e7eb; border-radius: 0.6rem; padding: 0.85rem 1rem; }
+.proscons-col::before {
+  display: block; font-weight: 700; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;
+}
+.proscons-pros { background: #f0fdf4; border-color: #bbf7d0; }
+.proscons-pros::before { content: "✅ Pros"; color: #15803d; }
+.proscons-cons { background: #fef2f2; border-color: #fecaca; }
+.proscons-cons::before { content: "❌ Cons"; color: #b91c1c; }
+@media (max-width: 640px) { .proscons { grid-template-columns: 1fr; } }

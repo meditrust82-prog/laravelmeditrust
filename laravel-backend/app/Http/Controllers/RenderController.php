@@ -22,6 +22,10 @@ class RenderController extends Controller
         $description = $this->escape($props['description'] ?? $this->defaultDesc);
         $canonical = $this->escape($props['canonical'] ?? $this->site);
         $image = $this->escape($props['image'] ?? ($this->site . '/logo.png'));
+        $ogType = $this->escape($props['ogType'] ?? 'website');
+        $ogTitle = !empty($props['ogTitle']) ? $this->escape($props['ogTitle']) : $title;
+        $ogDesc = !empty($props['ogDesc']) ? $this->escape($props['ogDesc']) : $description;
+        $ogImage = !empty($props['ogImage']) ? $this->escape($props['ogImage']) : $image;
         $body = $props['body'] ?? '';
         $schemas = collect($props['schemas'] ?? [])
             ->map(fn ($schema) => '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>')
@@ -38,18 +42,18 @@ class RenderController extends Controller
   <link rel=\"alternate\" hreflang=\"en\" href=\"{$canonical}\"/>
   <link rel=\"alternate\" hreflang=\"ne\" href=\"{$canonical}\"/>
   <link rel=\"alternate\" hreflang=\"x-default\" href=\"{$canonical}\"/>
-  <meta property=\"og:title\" content=\"{$title}\"/>
-  <meta property=\"og:description\" content=\"{$description}\"/>
+  <meta property=\"og:title\" content=\"{$ogTitle}\"/>
+  <meta property=\"og:description\" content=\"{$ogDesc}\"/>
   <meta property=\"og:url\" content=\"{$canonical}\"/>
-  <meta property=\"og:image\" content=\"{$image}\"/>
-  <meta property=\"og:type\" content=\"website\"/>
+  <meta property=\"og:image\" content=\"{$ogImage}\"/>
+  <meta property=\"og:type\" content=\"{$ogType}\"/>
   <meta property=\"og:site_name\" content=\"{$this->escape($this->siteName)}\"/>
   <meta property=\"og:locale\" content=\"en_US\"/>
   <meta property=\"og:locale:alternate\" content=\"ne_NP\"/>
   <meta name=\"twitter:card\" content=\"summary_large_image\"/>
-  <meta name=\"twitter:title\" content=\"{$title}\"/>
-  <meta name=\"twitter:description\" content=\"{$description}\"/>
-  <meta name=\"twitter:image\" content=\"{$image}\"/>
+  <meta name=\"twitter:title\" content=\"{$ogTitle}\"/>
+  <meta name=\"twitter:description\" content=\"{$ogDesc}\"/>
+  <meta name=\"twitter:image\" content=\"{$ogImage}\"/>
   <meta name=\"robots\" content=\"index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1\"/>
   <meta name=\"geo.region\" content=\"NP\"/>
   <meta name=\"geo.placename\" content=\"Kathmandu, Nepal\"/>
@@ -88,7 +92,7 @@ class RenderController extends Controller
 
         $path = preg_replace('/[<>"\']/', '', (string) $req->query('path', '/products'));
 
-        if (preg_match('#^/products/([^/?#]+)$#', $path, $m)) {
+        if (preg_match('~^/products/([^/?#]+)$~', $path, $m)) {
             $slugOrId = $m[1];
             $product = Product::where('slug', $slugOrId)
                 ->orWhere('id', $slugOrId)
@@ -168,6 +172,10 @@ class RenderController extends Controller
                 'description' => $description,
                 'canonical' => $canonical,
                 'image' => $images[0] ?? ($this->site . '/logo.png'),
+                'ogType' => 'product',
+                'ogTitle' => $product->og_title ?: null,
+                'ogDesc' => $product->og_desc ?: null,
+                'ogImage' => $product->og_image ?: null,
                 'schemas' => [$productSchema, $breadcrumb, $faq],
                 'body' => $body,
             ]));

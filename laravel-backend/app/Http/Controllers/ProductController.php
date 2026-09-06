@@ -123,6 +123,20 @@ class ProductController extends Controller
         return response()->json($data);
     }
 
+    protected function decodeJsonArray($value): array
+    {
+        if (is_array($value)) {
+            return array_values($value);
+        }
+        if (is_string($value) && trim($value) !== '') {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return array_values($decoded);
+            }
+        }
+        return [];
+    }
+
     protected function parseImages(Request $req): array
     {
         $images = [];
@@ -153,6 +167,21 @@ class ProductController extends Controller
             'metaTitle' => ['nullable', 'string'],
             'metaDescription' => ['nullable', 'string'],
             'metaKeywords' => ['nullable', 'string'],
+            'focusKeyword' => ['nullable', 'string'],
+            'canonical' => ['nullable', 'string'],
+            'robots' => ['nullable', 'string'],
+            'ogTitle' => ['nullable', 'string'],
+            'ogDesc' => ['nullable', 'string'],
+            'ogImage' => ['nullable', 'string'],
+            'primaryQuestion' => ['nullable', 'string'],
+            'directAnswer' => ['nullable', 'string'],
+            'keyTakeaways' => ['nullable'],
+            'faqs' => ['nullable'],
+            'country' => ['nullable', 'string'],
+            'locations' => ['nullable'],
+            'entities' => ['nullable'],
+            'targetAudience' => ['nullable'],
+            'searchIntent' => ['nullable', 'string'],
             'badges' => ['nullable'],
         ]);
 
@@ -172,6 +201,21 @@ class ProductController extends Controller
             'meta_title' => $data['metaTitle'] ?? null,
             'meta_description' => $data['metaDescription'] ?? null,
             'meta_keywords' => $data['metaKeywords'] ?? null,
+            'focus_keyword' => $data['focusKeyword'] ?? null,
+            'canonical' => $data['canonical'] ?? null,
+            'robots' => $data['robots'] ?? 'index,follow',
+            'og_title' => $data['ogTitle'] ?? null,
+            'og_desc' => $data['ogDesc'] ?? null,
+            'og_image' => $data['ogImage'] ?? null,
+            'primary_question' => $data['primaryQuestion'] ?? null,
+            'direct_answer' => $data['directAnswer'] ?? null,
+            'key_takeaways' => $this->decodeJsonArray($data['keyTakeaways'] ?? null),
+            'faqs' => $this->decodeJsonArray($data['faqs'] ?? null),
+            'country' => $data['country'] ?? 'Nepal',
+            'locations' => $this->decodeJsonArray($data['locations'] ?? null),
+            'entities' => $this->decodeJsonArray($data['entities'] ?? null),
+            'target_audience' => $this->decodeJsonArray($data['targetAudience'] ?? null),
+            'search_intent' => $data['searchIntent'] ?? 'transactional',
             'badges' => is_array($data['badges'] ?? null) ? $data['badges'] : array_values(array_filter(array_map('trim', explode('|', (string) ($data['badges'] ?? ''))))),
         ]);
 
@@ -200,6 +244,21 @@ class ProductController extends Controller
             'metaTitle' => ['sometimes', 'nullable', 'string'],
             'metaDescription' => ['sometimes', 'nullable', 'string'],
             'metaKeywords' => ['sometimes', 'nullable', 'string'],
+            'focusKeyword' => ['sometimes', 'nullable', 'string'],
+            'canonical' => ['sometimes', 'nullable', 'string'],
+            'robots' => ['sometimes', 'nullable', 'string'],
+            'ogTitle' => ['sometimes', 'nullable', 'string'],
+            'ogDesc' => ['sometimes', 'nullable', 'string'],
+            'ogImage' => ['sometimes', 'nullable', 'string'],
+            'primaryQuestion' => ['sometimes', 'nullable', 'string'],
+            'directAnswer' => ['sometimes', 'nullable', 'string'],
+            'keyTakeaways' => ['sometimes', 'nullable'],
+            'faqs' => ['sometimes', 'nullable'],
+            'country' => ['sometimes', 'nullable', 'string'],
+            'locations' => ['sometimes', 'nullable'],
+            'entities' => ['sometimes', 'nullable'],
+            'targetAudience' => ['sometimes', 'nullable'],
+            'searchIntent' => ['sometimes', 'nullable', 'string'],
             'badges' => ['sometimes'],
         ]);
 
@@ -218,6 +277,21 @@ class ProductController extends Controller
             'meta_title' => $data['metaTitle'] ?? $product->meta_title,
             'meta_description' => $data['metaDescription'] ?? $product->meta_description,
             'meta_keywords' => $data['metaKeywords'] ?? $product->meta_keywords,
+            'focus_keyword' => $data['focusKeyword'] ?? $product->focus_keyword,
+            'canonical' => $data['canonical'] ?? $product->canonical,
+            'robots' => $data['robots'] ?? $product->robots,
+            'og_title' => $data['ogTitle'] ?? $product->og_title,
+            'og_desc' => $data['ogDesc'] ?? $product->og_desc,
+            'og_image' => $data['ogImage'] ?? $product->og_image,
+            'primary_question' => $data['primaryQuestion'] ?? $product->primary_question,
+            'direct_answer' => $data['directAnswer'] ?? $product->direct_answer,
+            'key_takeaways' => array_key_exists('keyTakeaways', $data) ? $this->decodeJsonArray($data['keyTakeaways']) : $product->key_takeaways,
+            'faqs' => array_key_exists('faqs', $data) ? $this->decodeJsonArray($data['faqs']) : $product->faqs,
+            'country' => $data['country'] ?? $product->country,
+            'locations' => array_key_exists('locations', $data) ? $this->decodeJsonArray($data['locations']) : $product->locations,
+            'entities' => array_key_exists('entities', $data) ? $this->decodeJsonArray($data['entities']) : $product->entities,
+            'target_audience' => array_key_exists('targetAudience', $data) ? $this->decodeJsonArray($data['targetAudience']) : $product->target_audience,
+            'search_intent' => $data['searchIntent'] ?? $product->search_intent,
             'badges' => array_key_exists('badges', $data)
                 ? (is_array($data['badges']) ? $data['badges'] : array_values(array_filter(array_map('trim', explode('|', (string) $data['badges'])))))
                 : $product->badges,

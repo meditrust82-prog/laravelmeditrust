@@ -26,6 +26,9 @@ const SeoHead = ({
   description = DEFAULT_DESCRIPTION,
   keywords = DEFAULT_KEYWORDS,
   image = DEFAULT_IMAGE,
+  ogTitle,
+  ogDesc,
+  ogImage,
   type = 'website',
   schemas = [],
   noindex = false,
@@ -36,7 +39,14 @@ const SeoHead = ({
   const canonicalRaw = canonicalProp || location.pathname;
   const canonical = canonicalRaw.startsWith('http') ? canonicalRaw : `${SITE_URL}${canonicalRaw}`;
   const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Medical Equipment Supplier Nepal`;
-  const ogImage = image.startsWith('http') ? image : `${SITE_URL}${image}`;
+  const resolvedImage = image.startsWith('http') ? image : `${SITE_URL}${image}`;
+
+  // Social-share overrides (Open Graph / Twitter). Fall back to regular title/description/image.
+  const socialTitle = ogTitle ? `${ogTitle} | ${SITE_NAME}` : fullTitle;
+  const socialDesc = ogDesc || description;
+  const socialImage = ogImage
+    ? (ogImage.startsWith('http') ? ogImage : `${SITE_URL}${ogImage}`)
+    : resolvedImage;
 
   return (
     <Helmet>
@@ -56,10 +66,10 @@ const SeoHead = ({
 
       {/* ── Open Graph ───────────────────────────────────────── */}
       <meta property="og:type" content={type} />
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
+      <meta property="og:title" content={socialTitle} />
+      <meta property="og:description" content={socialDesc} />
       <meta property="og:url" content={canonical} />
-      <meta property="og:image" content={ogImage} />
+      <meta property="og:image" content={socialImage} />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
       <meta property="og:site_name" content={SITE_NAME} />
@@ -68,9 +78,9 @@ const SeoHead = ({
 
       {/* ── Twitter Card ─────────────────────────────────────── */}
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={ogImage} />
+      <meta name="twitter:title" content={socialTitle} />
+      <meta name="twitter:description" content={socialDesc} />
+      <meta name="twitter:image" content={socialImage} />
 
       {/* ── JSON-LD Structured Data (AEO) ────────────────────── */}
       {schemas.map((schema, i) => (
@@ -283,22 +293,83 @@ export const buildFAQSchema = (faqs) => ({
   })),
 });
 
-export const buildBlogPostingSchema = (post) => ({
-  '@context': 'https://schema.org',
-  '@type': 'BlogPosting',
-  headline: post.title,
-  description: post.excerpt || post.title,
-  image: post.image ? (post.image.startsWith('http') ? post.image : `${SITE_URL}${post.image}`) : `${SITE_URL}/logo.png`,
-  author: { '@type': 'Organization', name: post.author || SITE_NAME },
-  publisher: {
-    '@type': 'Organization',
-    name: SITE_NAME,
-    logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` },
-  },
-  datePublished: post.createdAt,
-  dateModified: post.updatedAt || post.createdAt,
-  url: `${SITE_URL}/blog/${post.slug || post.id}`,
-  mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/blog/${post.slug || post.id}` },
-});
+export const buildPersonSchema = ({ name, jobTitle, url, image, description }) => {
+  if (!name) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name,
+    ...(jobTitle ? { jobTitle } : {}),
+    ...(url ? { url } : {}),
+    ...(image ? { image } : {}),
+    ...(description ? { description } : {}),
+  };
+};
+
+const stripTags = (html = '') => String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+export const buildBlogPostingSchema = (post) => {
+  const slug = post.slug || post.id;
+  const url = `${SITE_URL}/blog/${slug}`;
+  const image = post.image
+    ? (post.image.startsWith('http') ? post.image : `${SITE_URL}${post.image}`)
+    : `${SITE_URL}/logo.png`;
+
+  const hasPersonAuthor = !!(post.authorBio || post.authorCredentials || post.authorUrl || post.authorPhoto);
+  const author = hasPersonAuthor
+    ? {
+        '@type': 'Person',
+        name: post.author || SITE_NAME,
+        ...(post.authorCredentials ? { jobTitle: post.authorCredentials } : {}),
+        ...(post.authorUrl ? { url: post.authorUrl } : {}),
+        ...(post.authorPhoto ? { image: post.authorPhoto } : {}),
+        ...(post.authorBio ? { description: post.authorBio } : {}),
+      }
+    : { '@type': 'Organization', name: post.author || SITE_NAME };
+
+  const keywords = [...(Array.isArray(post.secondaryKeywords) ? post.secondaryKeywords : []), post.focusKeyword]
+    .filter(Boolean)
+    .join(', ');
+
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    '@id': `${url}#article`,
+    headline: post.title,
+    description: post.metaDesc || post.excerpt || post.title,
+    image,
+    author,
+    publisher: {
+      '@type': 'Organization',
+      '@id': `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      logo: { '@type': 'ImageObject', url: `${SITE_URL}/logo.png` },
+    },
+    datePublished: post.publishedAt || post.createdAt,
+    dateModified: post.updatedAt || post.createdAt,
+    url,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    inLanguage: 'en',
+  };
+
+  if (post.articleSection || post.category) schema.articleSection = post.articleSection || post.category;
+  if (keywords) schema.keywords = keywords;
+  if (post.wordCount) schema.wordCount = post.wordCount;
+  if (Array.isArray(post.entities) && post.entities.length) {
+    schema.about = post.entities.map((e) => ({ '@type': 'Thing', name: e }));
+  }
+  if (post.country) schema.spatialCoverage = { '@type': 'Place', name: post.country };
+  if (post.content) schema.articleBody = stripTags(post.content).slice(0, 20000);
+  if (post.reviewerName) {
+    schema.reviewedBy = {
+      '@type': 'Person',
+      name: post.reviewerName,
+      ...(post.reviewerDesignation ? { jobTitle: post.reviewerDesignation } : {}),
+      ...(post.reviewerUrl ? { url: post.reviewerUrl } : {}),
+    };
+  }
+
+  return schema;
+};
 
 export default SeoHead;

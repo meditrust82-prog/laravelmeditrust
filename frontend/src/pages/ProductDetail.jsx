@@ -191,7 +191,10 @@ const ProductDetail = () => {
       <SeoHead
         title={product.metaTitle || `${product.name} — Buy in Nepal`}
         description={product.metaDescription || product.description?.substring(0, 160) || `Buy ${product.name} from Meditrust Nepal. CE & ISO certified, competitive pricing, and 24/7 technical support across Nepal.`}
-        image={images[0]?.path || undefined}
+        image={images[0] || undefined}
+        ogTitle={product.ogTitle || undefined}
+        ogDesc={product.ogDesc || undefined}
+        ogImage={product.ogImage || undefined}
         type="product"
         keywords={product.metaKeywords || `${product.name}, ${product.category || 'medical equipment'} Nepal, buy ${product.name} Kathmandu, ${product.brand ? product.brand + ' Nepal' : 'medical equipment Nepal'}`}
         canonical={product.slug ? `/products/${product.slug}` : undefined}

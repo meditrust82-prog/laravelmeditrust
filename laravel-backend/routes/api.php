@@ -52,6 +52,7 @@ Route::middleware("throttle:{$globalThrottle}")->group(function () use ($loginTh
     Route::post('ai/chat', [AiController::class, 'chat'])->middleware('throttle:20,1');
     Route::post('ai/recommend', [AiController::class, 'recommend'])->middleware('throttle:8,1');
     Route::post('ai/finder', [AiController::class, 'finder'])->middleware('throttle:8,1');
+    Route::post('ai/blog-generate', [AiController::class, 'generateBlog'])->middleware(['jwt', 'admin', 'throttle:10,1']);
 
     Route::post('webhooks/khalti', [WebhookController::class, 'khalti'])->middleware('throttle:20,15');
 
@@ -98,6 +99,8 @@ Route::middleware("throttle:{$globalThrottle}")->group(function () use ($loginTh
     Route::put('about-settings', [AboutController::class, 'update'])->middleware(['jwt', 'admin']);
     Route::get('blogs', [BlogController::class, 'index']);
     Route::get('blogs/all', [BlogController::class, 'all'])->middleware(['jwt', 'admin']);
+    Route::post('blogs/upload', [BlogController::class, 'upload'])->middleware(['jwt', 'admin']);
+    Route::post('blogs/{id}/duplicate', [BlogController::class, 'duplicate'])->middleware(['jwt', 'admin']);
     Route::get('blogs/{slug}', [BlogController::class, 'show']);
     Route::post('blogs', [BlogController::class, 'store'])->middleware(['jwt', 'admin']);
     Route::put('blogs/{id}', [BlogController::class, 'update'])->middleware(['jwt', 'admin']);

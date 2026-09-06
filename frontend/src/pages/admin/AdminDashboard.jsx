@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   FaHome, FaBox, FaProjectDiagram, FaComments, FaEnvelope, FaBlog, FaTags,
@@ -6,10 +6,11 @@ import {
   FaCheck, FaFolder, FaUpload, FaTrashAlt, FaChevronRight,
   FaChevronDown, FaSearch, FaStar, FaArrowUp, FaArrowDown,
   FaCog, FaKey, FaLock, FaWhatsapp, FaTelegram, FaSms, FaShippingFast,
-  FaEyeSlash, FaUserShield, FaCheckCircle, FaTimesCircle, FaFileAlt, FaBell, FaImages
+  FaEyeSlash, FaUserShield, FaCheckCircle, FaTimesCircle, FaFileAlt, FaBell, FaImages, FaTachometerAlt
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import api from '../../api';
+import { computeProductReadiness, scoreColor } from '../../utils/seoScore';
 import Logo from '../../components/Logo';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadingSpinner, { PageLoader, SkeletonTable } from '../../components/ui/LoadingSpinner';
@@ -17,6 +18,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import Modal from '../../components/ui/Modal';
 import StatusBadge from '../../components/ui/StatusBadge';
 import RichTextEditor from '../../components/ui/RichTextEditor';
+import BlogAdmin from './BlogAdmin';
 
 // ==================== SHARED UNSAVED GUARD ====================
 const useUnsavedGuard = (isDirty) => {
@@ -26,6 +28,55 @@ const useUnsavedGuard = (isDirty) => {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
+};
+
+const ScorePill = ({ score, size = 'sm' }) => {
+  const c = scoreColor(score);
+  return (
+    <span className={`inline-flex items-center gap-1 font-bold rounded-full ${c.bg} ${c.text} ${size === 'sm' ? 'text-xs px-2 py-0.5' : 'text-sm px-3 py-1'}`}>
+      <FaTachometerAlt className={size === 'sm' ? 'text-[10px]' : 'text-xs'} /> {score}
+    </span>
+  );
+};
+
+const CommaListInput = ({ value, onChange, placeholder }) => {
+  const [text, setText] = useState(Array.isArray(value) ? value.join(', ') : '');
+  useEffect(() => {
+    setText(Array.isArray(value) ? value.join(', ') : '');
+  }, [value]);
+  const commit = () => {
+    onChange(text.split(',').map((s) => s.trim()).filter(Boolean));
+  };
+  return (
+    <input
+      type="text"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+      placeholder={placeholder}
+      className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm"
+    />
+  );
+};
+
+const FaqListEditor = ({ value, onChange }) => {
+  const faqs = Array.isArray(value) ? value : [];
+  const set = (i, patch) => onChange(faqs.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
+  const add = () => onChange([...faqs, { q: '', a: '' }]);
+  const remove = (i) => onChange(faqs.filter((_, idx) => idx !== i));
+  return (
+    <div className="space-y-2">
+      {faqs.map((f, i) => (
+        <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+          <input type="text" value={f.q || ''} onChange={(e) => set(i, { q: e.target.value })} placeholder="Question" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-primary-500" />
+          <textarea rows={2} value={f.a || ''} onChange={(e) => set(i, { a: e.target.value })} placeholder="Answer" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+          <button type="button" onClick={() => remove(i)} className="text-xs text-red-500 hover:text-red-600">Remove</button>
+        </div>
+      ))}
+      <button type="button" onClick={add} className="text-xs px-3 py-1.5 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100">+ Add FAQ</button>
+    </div>
+  );
 };
 
 // ==================== SIDEBAR ====================
@@ -841,11 +892,26 @@ const ProductsSection = () => {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const BADGE_OPTIONS = ['CE & ISO Certified', 'Warranty Included', 'Free Consultation', 'Nepal-wide Delivery'];
-  const [form, setForm] = useState({ name: '', categoryId: '', description: '', specifications: '', price: '', originalPrice: '', discountPct: '', cost: '', quantity: '', featured: false, slug: '', metaTitle: '', metaDescription: '', metaKeywords: '', badges: [] });
+  const [form, setForm] = useState({ name: '', categoryId: '', description: '', specifications: '', price: '', originalPrice: '', discountPct: '', cost: '', quantity: '', featured: false, slug: '', metaTitle: '', metaDescription: '', metaKeywords: '', badges: [], focusKeyword: '', canonical: '', robots: 'index,follow', ogTitle: '', ogDesc: '', primaryQuestion: '', directAnswer: '', keyTakeaways: [], faqs: [], country: 'Nepal', locations: [], entities: [], targetAudience: [], searchIntent: 'transactional', ogImage: '' });
+  const [showScoreDetail, setShowScoreDetail] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
   const [activeTab, setActiveTab] = useState('basic');
   const [uploading, setUploading] = useState(false);
+  const socialImageOptions = [...(existingImages || []).map(img => img.url || img.path || '').filter(Boolean), ...(uploadedImages || []).map(file => URL.createObjectURL(file))].filter(Boolean);
+
+  const handleQuickImageUpdate = async (productId, file) => {
+    if (!file) return;
+    try {
+      const fd = new FormData();
+      fd.append('images', file);
+      await api.put(`/products/${productId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success('Product image updated');
+      fetchProducts();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update product image');
+    }
+  };
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [categoryFilter, setCategoryFilter] = useState(searchParams.get('category') || '');
   const [page, setPage] = useState(1);
@@ -893,7 +959,9 @@ const ProductsSection = () => {
   useEffect(() => { fetchCategories(); }, [fetchCategories]);
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
-  const emptyForm = { name: '', category: '', description: '', specifications: '', price: '', originalPrice: '', discountPct: '', cost: '', stock: '', featured: false, slug: '', metaTitle: '', metaDescription: '', metaKeywords: '', badges: [] };
+  const emptyForm = { name: '', category: '', description: '', specifications: '', price: '', originalPrice: '', discountPct: '', cost: '', stock: '', featured: false, slug: '', metaTitle: '', metaDescription: '', metaKeywords: '', badges: [], focusKeyword: '', canonical: '', robots: 'index,follow', ogTitle: '', ogDesc: '', primaryQuestion: '', directAnswer: '', keyTakeaways: [], faqs: [], country: 'Nepal', locations: [], entities: [], targetAudience: [], searchIntent: 'transactional', ogImage: '' };
+
+  const productReport = computeProductReadiness(form);
 
   const openDuplicate = (product) => {
     setEditItem(null);
@@ -912,6 +980,9 @@ const ProductsSection = () => {
       metaTitle: '',
       metaDescription: '',
       metaKeywords: '',
+      focusKeyword: '', canonical: '', robots: 'index,follow', ogTitle: '', ogDesc: '', ogImage: '',
+      primaryQuestion: '', directAnswer: '', keyTakeaways: [], faqs: [],
+      country: 'Nepal', locations: [], entities: [], targetAudience: [], searchIntent: 'transactional',
       badges: product.badges || [],
     });
     setUploadedImages([]);
@@ -923,7 +994,7 @@ const ProductsSection = () => {
     if (!form.name.trim()) { toast.error('Enter a product name first'); return; }
     setAiFilling(true);
     try {
-      const prompt = `You are an SEO expert for a medical equipment supplier in Nepal called Meditrust Nepal.
+      const prompt = `You are an SEO/AEO/GEO expert for a medical equipment supplier in Nepal called Meditrust Nepal.
 Given this product: "${form.name}"${form.category ? ` (Category: ${form.category})` : ''}.
 Generate the following in JSON format only, no markdown:
 {
@@ -931,9 +1002,15 @@ Generate the following in JSON format only, no markdown:
   "metaTitle": "Product Name — Buy in Nepal | Meditrust Nepal",
   "metaDescription": "150-160 char description for Google",
   "metaKeywords": "product name Nepal, buy product Kathmandu, product category Nepal, brand Nepal, medical equipment Nepal",
-  "description": "2-3 sentence product description mentioning Nepal, CE/ISO certified"
+  "description": "2-3 sentence product description mentioning Nepal, CE/ISO certified",
+  "focusKeyword": "primary keyword phrase",
+  "primaryQuestion": "main question buyers ask about this product",
+  "directAnswer": "40-60 word direct answer for AI snippets",
+  "keyTakeaways": ["3-4 key features or benefits"],
+  "faqs": [{"q": "question", "a": "answer"}],
+  "searchIntent": "transactional"
 }`;
-      const res = await api.post('/ai/chat', { messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 400 });
+      const res = await api.post('/ai/chat', { messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 600 });
       const data = res.data;
       if (!data.choices) throw new Error('AI service error');
       const text = data.choices?.[0]?.message?.content || '';
@@ -946,6 +1023,12 @@ Generate the following in JSON format only, no markdown:
         metaDescription: json.metaDescription || prev.metaDescription,
         metaKeywords: json.metaKeywords || prev.metaKeywords,
         description: prev.description || json.description || '',
+        focusKeyword: json.focusKeyword || prev.focusKeyword,
+        primaryQuestion: json.primaryQuestion || prev.primaryQuestion,
+        directAnswer: json.directAnswer || prev.directAnswer,
+        keyTakeaways: Array.isArray(json.keyTakeaways) ? json.keyTakeaways : prev.keyTakeaways,
+        faqs: Array.isArray(json.faqs) ? json.faqs : prev.faqs,
+        searchIntent: json.searchIntent || prev.searchIntent,
       }));
       toast.success('AI fields filled!');
     } catch (err) {
@@ -974,6 +1057,21 @@ Generate the following in JSON format only, no markdown:
       formData.append('metaTitle', form.metaTitle);
       formData.append('metaDescription', form.metaDescription);
       formData.append('metaKeywords', form.metaKeywords);
+      formData.append('focusKeyword', form.focusKeyword);
+      formData.append('canonical', form.canonical);
+      formData.append('robots', form.robots);
+      formData.append('ogTitle', form.ogTitle);
+      formData.append('ogDesc', form.ogDesc);
+      formData.append('ogImage', form.ogImage);
+      formData.append('primaryQuestion', form.primaryQuestion);
+      formData.append('directAnswer', form.directAnswer);
+      formData.append('keyTakeaways', JSON.stringify(form.keyTakeaways || []));
+      formData.append('faqs', JSON.stringify(form.faqs || []));
+      formData.append('country', form.country);
+      formData.append('locations', JSON.stringify(form.locations || []));
+      formData.append('entities', JSON.stringify(form.entities || []));
+      formData.append('targetAudience', JSON.stringify(form.targetAudience || []));
+      formData.append('searchIntent', form.searchIntent);
       form.badges.forEach(b => formData.append('badges', b));
       uploadedImages.forEach(img => formData.append('images', img));
 
@@ -1051,6 +1149,21 @@ Generate the following in JSON format only, no markdown:
       metaTitle: product.metaTitle || '',
       metaDescription: product.metaDescription || '',
       metaKeywords: product.metaKeywords || '',
+      focusKeyword: product.focusKeyword || '',
+      canonical: product.canonical || '',
+      robots: product.robots || 'index,follow',
+      ogTitle: product.ogTitle || '',
+      ogDesc: product.ogDesc || '',
+      ogImage: product.ogImage || '',
+      primaryQuestion: product.primaryQuestion || '',
+      directAnswer: product.directAnswer || '',
+      keyTakeaways: product.keyTakeaways || [],
+      faqs: product.faqs || [],
+      country: product.country || 'Nepal',
+      locations: product.locations || [],
+      entities: product.entities || [],
+      targetAudience: product.targetAudience || [],
+      searchIntent: product.searchIntent || 'transactional',
       badges: product.badges || [],
     });
     setUploadedImages([]);
@@ -1130,6 +1243,7 @@ Generate the following in JSON format only, no markdown:
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Price</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Qty</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Featured</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold text-gray-500 uppercase">Score</th>
                     <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
@@ -1184,8 +1298,24 @@ Generate the following in JSON format only, no markdown:
                           <span className="text-sm text-gray-400">No</span>
                         )}
                       </td>
+                      <td className="px-4 py-4">
+                        <ScorePill score={computeProductReadiness(product).score} />
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <label className="cursor-pointer p-2 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors" title="Update product image">
+                            <FaUpload className="text-sm" />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleQuickImageUpdate(product.id, file);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
                           <button onClick={() => openEdit(product)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
                             <FaEdit />
                           </button>
@@ -1222,11 +1352,58 @@ Generate the following in JSON format only, no markdown:
       {/* Product Form Modal */}
       <Modal isOpen={showForm} onClose={() => { setShowForm(false); setEditItem(null); setUploadedImages([]); setExistingImages([]); setForm(emptyForm); setActiveTab('basic'); }} title={editItem ? 'Edit Product' : 'Add New Product'} size="lg">
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* SEO / AEO / GEO readiness score */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <FaTachometerAlt className="text-primary-600" />
+                <span className="text-sm font-bold text-gray-800">SEO / AEO / GEO Readiness</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <ScorePill score={productReport.score} size="md" />
+                <button type="button" onClick={() => setShowScoreDetail(v => !v)} className="text-xs text-primary-600 hover:underline">
+                  {showScoreDetail ? 'Hide details' : 'Details'}
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+              {productReport.sections.map(s => (
+                <div key={s.key} className="bg-white rounded-lg border border-gray-100 p-2 text-center">
+                  <div className="text-xs font-semibold text-gray-500">{s.label}</div>
+                  <div className={`text-lg font-bold ${scoreColor(s.score).text}`}>{s.score}</div>
+                  <div className="text-[10px] text-gray-400">{s.passed}/{s.total} checks</div>
+                </div>
+              ))}
+            </div>
+            {showScoreDetail && (
+              <div className="space-y-2 mt-2">
+                {productReport.sections.map(s => (
+                  <div key={s.key} className="bg-white rounded-lg border border-gray-100 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-gray-700">{s.label}</span>
+                      <span className={`text-xs font-bold ${scoreColor(s.score).text}`}>{s.score}</span>
+                    </div>
+                    <ul className="space-y-1">
+                      {s.checks.map((c, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs">
+                          {c.pass
+                            ? <FaCheckCircle className="text-green-500 mt-0.5 shrink-0" />
+                            : <FaTimesCircle className="text-gray-300 mt-0.5 shrink-0" />}
+                          <span className={c.pass ? 'text-gray-700' : 'text-gray-500'}>{c.label}{!c.pass && c.hint ? <span className="text-gray-400"> — {c.hint}</span> : null}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Tabs */}
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-            {[['basic','Basic Info'],['pricing','Pricing'],['images','Images'],['seo','SEO']].map(([key,label]) => (
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-wrap">
+            {[['basic','Basic Info'],['pricing','Pricing'],['images','Images'],['seo','SEO'],['aeo','AEO'],['geo','GEO']].map(([key,label]) => (
               <button key={key} type="button" onClick={() => setActiveTab(key)}
-                className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition-colors min-w-[64px] ${
                   activeTab === key ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}>{label}</button>
             ))}
@@ -1552,6 +1729,135 @@ Generate the following in JSON format only, no markdown:
                   className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm"
                 />
                 <p className="text-xs text-gray-400 mt-1">Comma-separated · Auto-filled by AI · Helps with search ranking</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Focus Keyword</label>
+                <input type="text" value={form.focusKeyword} onChange={(e) => setForm({ ...form, focusKeyword: e.target.value })} placeholder="digital bp monitor nepal" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Canonical URL</label>
+                <input type="text" value={form.canonical} onChange={(e) => setForm({ ...form, canonical: e.target.value })} placeholder="Leave blank for auto" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Robots</label>
+                <input type="text" value={form.robots} onChange={(e) => setForm({ ...form, robots: e.target.value })} placeholder="index,follow" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">OG Title</label>
+                <input type="text" value={form.ogTitle} onChange={(e) => setForm({ ...form, ogTitle: e.target.value })} placeholder="Social sharing title" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Social Description</label>
+                <textarea
+                  rows={3}
+                  value={form.ogDesc}
+                  onChange={(e) => setForm({ ...form, ogDesc: e.target.value })}
+                  placeholder="Custom share card description for Facebook, WhatsApp, X, and LinkedIn"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none text-sm"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, ogDesc: prev.metaDescription || prev.description?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) || '' }))}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                  >
+                    Use meta description
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, ogDesc: '' }))}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Social Image URL</label>
+                <input type="text" value={form.ogImage} onChange={(e) => setForm({ ...form, ogImage: e.target.value })} placeholder="https://… (1200×630 recommended; leave blank to use product image)" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm" />
+                {socialImageOptions.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500 mb-2">Or choose a product image</p>
+                    <div className="flex flex-wrap gap-2">
+                      {socialImageOptions.map((image, idx) => (
+                        <button
+                          key={`${image}-${idx}`}
+                          type="button"
+                          onClick={() => setForm(prev => ({ ...prev, ogImage: image }))}
+                          className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 transition ${form.ogImage === image ? 'border-primary-500 shadow-md' : 'border-gray-200 hover:border-primary-300'}`}
+                          title="Use this image for social sharing"
+                        >
+                          <img src={image} alt={`Social option ${idx + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, ogImage: socialImageOptions[0] || prev.ogImage || '' }))}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                  >
+                    Use first product image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, ogImage: '' }))}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                  >
+                    Clear image
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">Shown when the product is shared on Facebook, WhatsApp, X/Twitter, LinkedIn, and other social platforms.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* AEO Settings */}
+          <div style={{display: activeTab === 'aeo' ? '' : 'none'}}>
+            <div className="bg-primary-50/50 border border-primary-100 rounded-lg p-4 space-y-3">
+              <p className="text-xs font-bold uppercase text-primary-700">Answer Engine Optimization</p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Primary Question</label>
+                <input type="text" value={form.primaryQuestion} onChange={(e) => setForm({ ...form, primaryQuestion: e.target.value })} placeholder="What is the best [product] for home use in Nepal?" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Direct Answer (40–80 words)</label>
+                <textarea rows={3} value={form.directAnswer} onChange={(e) => setForm({ ...form, directAnswer: e.target.value })} placeholder="A concise answer suitable for featured snippets and AI summaries…" className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-none text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Key Takeaways</label>
+                <CommaListInput value={form.keyTakeaways} onChange={(v) => setForm({ ...form, keyTakeaways: v })} placeholder="Accurate readings, portable design, 2-year warranty…" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">FAQs</label>
+                <FaqListEditor value={form.faqs} onChange={(v) => setForm({ ...form, faqs: v })} />
+              </div>
+            </div>
+          </div>
+
+          {/* GEO Settings */}
+          <div style={{display: activeTab === 'geo' ? '' : 'none'}}>
+            <div className="bg-emerald-50/50 border border-emerald-100 rounded-lg p-4 space-y-3">
+              <p className="text-xs font-bold uppercase text-emerald-700">Generative Engine Optimization / Local</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                  <input type="text" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Target Audience</label>
+                  <CommaListInput value={form.targetAudience} onChange={(v) => setForm({ ...form, targetAudience: v })} placeholder="clinic owners, hospitals, home users" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Locations Served</label>
+                <CommaListInput value={form.locations} onChange={(v) => setForm({ ...form, locations: v })} placeholder="Kathmandu, Pokhara, Biratnagar…" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Relevant Entities</label>
+                <CommaListInput value={form.entities} onChange={(v) => setForm({ ...form, entities: v })} placeholder="WHO, ISO 13485, CE certification, Nepal Health…" />
               </div>
             </div>
           </div>
@@ -2330,8 +2636,8 @@ const AdminDashboard = () => {
             <Route path="quotes" element={<QuotesSection />} />
             <Route path="subscribers" element={<SubscribersSection />} />
             <Route path="gallery" element={<GallerySection />} />
-            <Route path="blog" element={<BlogSection />} />
-            <Route path="blog/new" element={<BlogSection />} />
+            <Route path="blog" element={<BlogAdmin />} />
+            <Route path="blog/new" element={<BlogAdmin />} />
             <Route path="homepage" element={<HomepageSection />} />
             <Route path="services-page" element={<ServicesPageSection />} />
             <Route path="about-page" element={<AboutPageSection />} />
@@ -3174,265 +3480,488 @@ const QuotesSection = () => {
 const GallerySection = () => {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [page, setPage] = useState(1);
+  const [darkMode, setDarkMode] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [editImage, setEditImage] = useState(null);
+  const [resizeTarget, setResizeTarget] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const pageSize = 12;
+  const sampleGalleryImages = [
+    'https://images.unsplash.com/photo-1584515933487-779824d29309?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1538108149393-fbbd81895973?auto=format&fit=crop&w=1200&q=80',
+  ];
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get('/products?limit=100');
-        const all = res.data.products || res.data || [];
-        const imgs = [];
-        all.forEach(p => {
-          if (p.images?.length) {
-            p.images.forEach(img => imgs.push({ url: img.url || img.path, alt: img.alt || p.name, productName: p.name, slug: p.slug }));
-          } else if (p.image) {
-            imgs.push({ url: p.image, alt: p.name, productName: p.name, slug: p.slug });
-          }
-        });
-        setImages(imgs);
-      } catch { toast.error('Failed to load gallery'); }
-      finally { setLoading(false); }
-    };
-    load();
-  }, []);
+  const formatBytes = (bytes) => {
+    if (!bytes || Number.isNaN(bytes)) return '0 KB';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = bytes;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+    return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+  };
 
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Product Gallery</h1>
-          <p className="text-gray-500 text-sm mt-1">{images.length} photo{images.length !== 1 ? 's' : ''} — upload images via Products → Edit</p>
-        </div>
-        <Link to="/admin/products" className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition flex items-center gap-2">
-          <FaImages className="text-xs" /> Manage Products
-        </Link>
-      </div>
+  const formatDate = (value) => {
+    if (!value) return 'Recently';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Recently';
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
-      {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 animate-pulse">
-          {[...Array(8)].map((_, i) => <div key={i} className="aspect-square bg-gray-100 rounded-xl" />)}
-        </div>
-      ) : images.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
-          <FaImages className="text-5xl mx-auto mb-4 text-gray-200" />
-          <p className="font-medium">No product images yet</p>
-          <p className="text-sm mt-1">Go to <Link to="/admin/products" className="text-primary-600 underline">Products</Link> and upload images for each product.</p>
-        </div>
-      ) : (
-        <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 space-y-3">
-          {images.map((img, i) => (
-            <div
-              key={i}
-              className="break-inside-avoid cursor-pointer group relative overflow-hidden rounded-xl shadow-sm hover:shadow-lg transition-shadow"
-              onClick={() => setLightbox({ img, i })}
-            >
-              <img src={img.url} alt={img.alt} loading="lazy" className="w-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-                <p className="text-white text-xs font-semibold line-clamp-2">{img.productName}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  const buildAltText = (item) => {
+    const product = item.productName || item.filename?.replace(/\.[^.]+$/, '') || 'Product';
+    const clean = product.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return clean ? `${clean} product photo` : 'Product photo';
+  };
 
-      {lightbox && (
-        <div className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
-          <button className="absolute top-4 right-4 text-white text-3xl font-bold hover:text-gray-300" onClick={() => setLightbox(null)}>×</button>
-          <button
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-white text-4xl px-2"
-            onClick={e => { e.stopPropagation(); setLightbox(lb => { const ni = (lb.i - 1 + images.length) % images.length; return { img: images[ni], i: ni }; }); }}
-          >‹</button>
-          <img src={lightbox.img.url} alt={lightbox.img.alt} className="max-h-[85vh] max-w-full object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
-          <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white text-4xl px-2"
-            onClick={e => { e.stopPropagation(); setLightbox(lb => { const ni = (lb.i + 1) % images.length; return { img: images[ni], i: ni }; }); }}
-          >›</button>
-          <div className="absolute bottom-4 text-white/60 text-sm">{lightbox.img.productName}</div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ==================== BLOG SECTION ====================
-const emptyPost = { title: '', excerpt: '', content: '', image: '', author: 'Meditrust Nepal', category: '', tags: '', published: true, metaTitle: '', metaDesc: '' };
-
-const BlogSection = () => {
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyPost);
-  const [saving, setSaving] = useState(false);
-
-  const load = useCallback(async () => {
+  const loadGallery = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get('/blogs/all');
-      setPosts(res.data.blogs || []);
-    } catch { toast.error('Failed to load blog posts'); }
-    finally { setLoading(false); }
+      const res = await api.get('/products?limit=100');
+      const all = res.data.products || res.data || [];
+      const flattened = [];
+
+      if (!all.length) {
+        setImages(sampleGalleryImages.map((url, index) => ({
+          id: `sample-${index}`,
+          url,
+          filename: `sample-product-${index + 1}.jpg`,
+          alt: `Sample medical product image ${index + 1}`,
+          productName: 'Sample product',
+          productId: null,
+          slug: '',
+          uploadedAt: new Date().toISOString(),
+          width: 1200,
+          height: 900,
+          size: 260000,
+          status: 'ready',
+        })));
+        setSelectedIds([]);
+        setPage(1);
+        return;
+      }
+
+      for (const product of all) {
+        const productImages = product.images?.length ? product.images : product.image ? [{ url: product.image, alt: product.name || 'Product photo' }] : [];
+        productImages.forEach((img, index) => {
+          const url = img.url || img.path || img;
+          if (!url) return;
+          flattened.push({
+            id: `${product.id || product._id || 'product'}-${index}`,
+            url,
+            filename: (url.split('/').pop() || `product-${index + 1}.jpg`).split('?')[0],
+            alt: img.alt || product.name || 'Product image',
+            productName: product.name || 'Product',
+            productId: product.id || product._id || null,
+            slug: product.slug || '',
+            uploadedAt: product.updatedAt || product.createdAt || new Date().toISOString(),
+            width: 0,
+            height: 0,
+            size: 0,
+            status: (img.alt || '').trim() ? 'ready' : 'missing-alt',
+          });
+        });
+      }
+
+      const enriched = await Promise.all(flattened.map(async (item) => {
+        try {
+          const meta = await new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+            img.onerror = () => resolve({ width: 0, height: 0 });
+            img.src = item.url;
+          });
+          const fileSize = Number.isFinite(item.size) && item.size > 0 ? item.size : 0;
+          return { ...item, ...meta, size: fileSize || Math.max(150, Math.round((meta.width || 1200) * (meta.height || 900) / 12)) };
+        } catch {
+          return { ...item, width: 0, height: 0, size: 0 };
+        }
+      }));
+
+      setImages(enriched);
+      setSelectedIds([]);
+      setPage(1);
+    } catch {
+      toast.error('Failed to load gallery');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadGallery(); }, [loadGallery]);
 
-  const openNew = () => { setForm(emptyPost); setEditing('new'); };
-  const openEdit = (p) => { setForm({ ...p, tags: (p.tags || []).join(', ') }); setEditing(p._id); };
-  const cancel = () => { setEditing(null); setForm(emptyPost); };
+  const filteredImages = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = images.filter((item) => {
+      const matchesSearch = !term || [item.filename, item.productName, item.alt].join(' ').toLowerCase().includes(term);
+      const matchesFilter = filter === 'all'
+        || (filter === 'missing-alt' && !item.alt)
+        || (filter === 'ready' && item.alt)
+        || (filter === 'large' && item.width > 1200 && item.height > 800);
+      return matchesSearch && matchesFilter;
+    });
 
-  const save = async (e) => {
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      if (sortBy === 'name') return (a.filename || '').localeCompare(b.filename || '');
+      if (sortBy === 'size') return (b.size || 0) - (a.size || 0);
+      if (sortBy === 'dimensions') return (b.width * b.height) - (a.width * a.height);
+      return new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0);
+    });
+
+    return sorted;
+  }, [images, search, filter, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredImages.length / pageSize));
+  const visibleImages = filteredImages.slice(0, page * pageSize);
+
+  useEffect(() => { setPage(1); }, [search, filter, sortBy]);
+
+  const toggleSelection = (id) => {
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
+  };
+
+  const bulkAction = async (action) => {
+    const selected = images.filter(img => selectedIds.includes(img.id));
+    if (!selected.length) {
+      toast.info('Select at least one image first');
+      return;
+    }
+
+    if (action === 'copy') {
+      const urls = selected.map(img => img.url).join('\n');
+      await navigator.clipboard.writeText(urls);
+      toast.success(`${selected.length} URL${selected.length > 1 ? 's' : ''} copied`);
+      return;
+    }
+
+    if (action === 'download') {
+      selected.forEach((img) => {
+        const link = document.createElement('a');
+        link.href = img.url;
+        link.download = img.filename || 'image';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+      toast.success(`Downloaded ${selected.length} file${selected.length > 1 ? 's' : ''}`);
+      return;
+    }
+
+    if (action === 'delete') {
+      if (!window.confirm(`Delete ${selected.length} selected image${selected.length > 1 ? 's' : ''}?`)) return;
+      setImages(prev => prev.filter(img => !selectedIds.includes(img.id)));
+      setSelectedIds([]);
+      toast.success('Selected images removed from gallery');
+    }
+  };
+
+  const updateAltText = (id, value) => {
+    setImages((prev) => prev.map(item => item.id === id ? { ...item, alt: value, status: value.trim() ? 'ready' : 'missing-alt' } : item));
+  };
+
+  const generateAltTextFor = async (id) => {
+    const item = images.find(img => img.id === id);
+    if (!item) return;
+    const next = buildAltText(item);
+    updateAltText(id, next);
+    toast.success('Alt text suggested');
+  };
+
+  const handleFiles = (fileList) => {
+    const files = Array.from(fileList || []).filter(file => file.type.startsWith('image/'));
+    if (!files.length) return;
+
+    const newImages = files.map((file, index) => {
+      const objectUrl = URL.createObjectURL(file);
+      const generatedName = file.name || `upload-${Date.now()}-${index}.jpg`;
+      return {
+        id: `uploaded-${Date.now()}-${index}`,
+        url: objectUrl,
+        filename: generatedName,
+        alt: buildAltText({ productName: file.name.replace(/\.[^.]+$/, ''), filename: generatedName }),
+        productName: 'New upload',
+        productId: null,
+        slug: '',
+        uploadedAt: new Date().toISOString(),
+        width: 0,
+        height: 0,
+        size: file.size || 0,
+        status: 'ready',
+      };
+    });
+
+    setImages((prev) => [...newImages, ...prev]);
+    toast.success(`${files.length} file${files.length > 1 ? 's' : ''} added to gallery`);
+  };
+
+  const handleDrop = (e) => {
     e.preventDefault();
-    if (!form.title.trim()) return toast.error('Title is required');
-    setSaving(true);
-    try {
-      const payload = { ...form, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean) };
-      if (editing === 'new') {
-        const res = await api.post('/blogs', payload);
-        setPosts(prev => [res.data, ...prev]);
-        toast.success('Post created');
-      } else {
-        const res = await api.put(`/blogs/${editing}`, payload);
-        setPosts(prev => prev.map(p => p._id === editing ? res.data : p));
-        toast.success('Post updated');
-      }
-      cancel();
-    } catch (err) { toast.error(err.response?.data?.error || 'Failed to save'); }
-    finally { setSaving(false); }
+    setDragActive(false);
+    handleFiles(e.dataTransfer.files);
   };
 
-  const remove = async (id) => {
-    if (!window.confirm('Delete this post?')) return;
-    try {
-      await api.delete(`/blogs/${id}`);
-      setPosts(prev => prev.filter(p => p._id !== id));
-      toast.success('Deleted');
-    } catch { toast.error('Failed to delete'); }
+  const openResize = (item) => setResizeTarget(item);
+
+  const applyResize = (item, width) => {
+    if (!item) return;
+    const url = item.url.includes('?') ? `${item.url}&w=${width}&h=${Math.round(width * 0.75)}&fit=crop` : `${item.url}?w=${width}&h=${Math.round(width * 0.75)}&fit=crop`;
+    const result = { ...item, url, filename: `${item.filename.replace(/\.[^.]+$/, '')}-${width}w.${item.filename.split('.').pop() || 'jpg'}` };
+    setImages(prev => prev.map(img => img.id === item.id ? result : img));
+    setResizeTarget(null);
+    toast.success(`Resized to ${width}px preview generated`);
   };
 
-  const toggle = async (p) => {
-    try {
-      const res = await api.put(`/blogs/${p._id}`, { published: !p.published });
-      setPosts(prev => prev.map(x => x._id === p._id ? res.data : x));
-    } catch { toast.error('Failed to update'); }
+  const openEditor = (item) => {
+    setEditImage({ ...item, altDraft: item.alt || '' });
   };
 
-  const field = (key, value) => setForm(f => ({ ...f, [key]: value }));
+  const saveEditedAlt = () => {
+    if (!editImage) return;
+    updateAltText(editImage.id, editImage.altDraft || '');
+    setEditImage(null);
+  };
 
-  if (editing) return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{editing === 'new' ? 'New Blog Post' : 'Edit Post'}</h1>
-        <button onClick={cancel} className="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"><FaTimes /> Cancel</button>
-      </div>
-      <form onSubmit={save} className="space-y-5 bg-white rounded-xl border border-gray-100 p-6">
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Title *</label>
-            <input value={form.title} onChange={e => field('title', e.target.value)} required className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" placeholder="Post title" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Author</label>
-            <input value={form.author} onChange={e => field('author', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Category</label>
-            <input value={form.category} onChange={e => field('category', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" placeholder="e.g. ICU Equipment" />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Cover Image URL</label>
-            <input value={form.image} onChange={e => field('image', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" placeholder="https://..." />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Excerpt</label>
-            <textarea value={form.excerpt} onChange={e => field('excerpt', e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 resize-none" placeholder="Short description shown in listings..." />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Content (HTML or Markdown)</label>
-            <textarea value={form.content} onChange={e => field('content', e.target.value)} rows={12} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-300 resize-y" placeholder="Full blog post content..." />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Tags (comma separated)</label>
-            <input value={form.tags} onChange={e => field('tags', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" placeholder="ICU, ventilator, Nepal" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Status</label>
-            <select value={form.published ? 'true' : 'false'} onChange={e => field('published', e.target.value === 'true')} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
-              <option value="true">Published</option>
-              <option value="false">Draft</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Meta Title</label>
-            <input value={form.metaTitle} onChange={e => field('metaTitle', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" placeholder="SEO title (optional)" />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Meta Description</label>
-            <input value={form.metaDesc} onChange={e => field('metaDesc', e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-300" placeholder="SEO description (optional)" />
-          </div>
-        </div>
-        <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={saving} className="bg-primary-600 text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition disabled:opacity-60">
-            {saving ? 'Saving...' : (editing === 'new' ? 'Publish Post' : 'Save Changes')}
-          </button>
-          <button type="button" onClick={cancel} className="border border-gray-200 text-gray-600 px-6 py-2 rounded-lg text-sm hover:bg-gray-50 transition">Cancel</button>
-        </div>
-      </form>
-    </div>
-  );
+  const selectedCount = selectedIds.length;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Blog Posts</h1>
-          <p className="text-gray-500 text-sm mt-1">Create and manage blog articles</p>
-        </div>
-        <button onClick={openNew} className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary-700 transition flex items-center gap-2">
-          <FaPlus className="text-xs" /> New Post
-        </button>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        {loading ? <SkeletonTable /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  {['Title', 'Category', 'Author', 'Status', 'Date', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {posts.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400">No blog posts yet. Click "New Post" to create one.</td></tr>
-                )}
-                {posts.map(p => (
-                  <tr key={p._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900 line-clamp-1 max-w-xs">{p.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{p.excerpt}</p>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{p.category || '—'}</td>
-                    <td className="px-4 py-3 text-gray-500">{p.author}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => toggle(p)} className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${p.published ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                        {p.published ? 'Published' : 'Draft'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 flex items-center gap-2">
-                      <a href={`/blog/${p.slug}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary-600 p-1"><FaEye className="text-xs" /></a>
-                      <button onClick={() => openEdit(p)} className="text-gray-400 hover:text-primary-600 p-1"><FaEdit className="text-xs" /></button>
-                      <button onClick={() => remove(p._id)} className="text-gray-400 hover:text-red-500 p-1"><FaTrash className="text-xs" /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <div className={darkMode ? 'dark' : ''}>
+      <div className={`rounded-3xl border ${darkMode ? 'border-slate-800 bg-slate-950 text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-800'} p-4 sm:p-6`}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="rounded-2xl bg-primary-100 p-2.5 text-primary-700">
+                <FaImages className="text-lg" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Media Library</h1>
+                <p className={darkMode ? 'text-slate-400' : 'text-slate-500'}>{images.length} total assets</p>
+              </div>
+            </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+              <FaUpload className="text-xs" />
+              <span>Upload</span>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            </label>
+            <button type="button" onClick={() => setDarkMode(v => !v)} className={`rounded-xl border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+              {darkMode ? 'Light' : 'Dark'} mode
+            </button>
+            <Link to="/admin/products" className="bg-primary-600 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:bg-primary-700 transition flex items-center gap-2">
+              <FaImages className="text-xs" /> Manage Products
+            </Link>
+          </div>
+        </div>
+
+        <div className={`mt-5 rounded-2xl border p-4 ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-white'}`}>
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative flex-1">
+              <FaSearch className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by filename, product or alt text"
+                className={`w-full rounded-xl border py-2.5 pl-10 pr-3 text-sm outline-none ring-0 ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-700 placeholder:text-slate-400'}`}
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`rounded-xl border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                <option value="all">All media</option>
+                <option value="ready">With alt text</option>
+                <option value="missing-alt">Missing alt text</option>
+                <option value="large">Large images</option>
+              </select>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`rounded-xl border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                <option value="newest">Newest</option>
+                <option value="name">Name</option>
+                <option value="size">Largest</option>
+                <option value="dimensions">Dimensions</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setSelectedIds(filteredImages.map(img => img.id))} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+              Select all
+            </button>
+            <button type="button" onClick={() => setSelectedIds([])} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+              Clear
+            </button>
+            {selectedCount > 0 && (
+              <>
+                <button type="button" onClick={() => bulkAction('copy')} className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700">Copy URLs</button>
+                <button type="button" onClick={() => bulkAction('download')} className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>Download</button>
+                <button type="button" onClick={() => bulkAction('delete')} className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600">Delete</button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className={`mt-5 rounded-2xl border border-dashed p-6 text-center ${dragActive ? 'border-primary-400 bg-primary-50' : darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-slate-100/70'}`} onDragEnter={(e) => { e.preventDefault(); setDragActive(true); }} onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }} onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
+          <div className="flex flex-col items-center justify-center gap-2 text-sm">
+            <FaUpload className={`text-xl ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+            <p className={darkMode ? 'text-slate-200' : 'text-slate-700'}>Drag and drop images here or click to upload</p>
+            <label className="cursor-pointer rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white">
+              Select files
+              <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            </label>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+            {[...Array(8)].map((_, index) => (
+              <div key={index} className={`animate-pulse rounded-2xl ${darkMode ? 'bg-slate-800' : 'bg-slate-200'}`} style={{ aspectRatio: '4 / 3' }} />
+            ))}
+          </div>
+        ) : filteredImages.length === 0 ? (
+          <div className="mt-10 rounded-2xl border border-dashed border-slate-300 py-16 text-center">
+            <FaImages className="mx-auto mb-4 text-5xl text-slate-300" />
+            <p className="text-lg font-semibold text-slate-700">No matches in the gallery</p>
+            <p className="mt-2 text-sm text-slate-500">Try a different keyword or upload a new image.</p>
+          </div>
+        ) : (
+          <>
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {visibleImages.map((img) => (
+                <article key={img.id} className={`group overflow-hidden rounded-2xl border shadow-sm transition-all ${darkMode ? 'border-slate-800 bg-slate-900 shadow-slate-950/30' : 'border-slate-200 bg-white shadow-slate-200/60'} ${selectedIds.includes(img.id) ? 'ring-2 ring-primary-400' : ''}`}>
+                  <div className="relative">
+                    <img src={img.url} alt={img.alt || 'Product gallery image'} loading="lazy" className="h-52 w-full object-cover transition duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-slate-900/10 to-transparent opacity-0 transition group-hover:opacity-100" />
+                    <button type="button" onClick={() => toggleSelection(img.id)} className={`absolute left-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border text-xs ${selectedIds.includes(img.id) ? 'border-primary-500 bg-primary-500 text-white' : darkMode ? 'border-slate-700 bg-slate-900/80 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} aria-label={`Select ${img.filename}`}>
+                      {selectedIds.includes(img.id) ? '✓' : ''}
+                    </button>
+                    <div className="absolute right-3 top-3 rounded-full bg-black/60 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-white">
+                      {img.width && img.height ? `${img.width}×${img.height}` : 'Image'}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold" title={img.filename}>{img.filename}</p>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${img.alt ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {img.alt ? 'Alt OK' : 'Missing'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500">
+                      <div className="rounded-lg bg-slate-100 px-2 py-1">{img.width && img.height ? `${img.width}×${img.height}` : '—'}</div>
+                      <div className="rounded-lg bg-slate-100 px-2 py-1">{formatBytes(img.size || 0)}</div>
+                      <div className="col-span-2 rounded-lg bg-slate-100 px-2 py-1">{formatDate(img.uploadedAt)}</div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className={`block text-[11px] font-medium uppercase tracking-wide ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Alt text</label>
+                      <input
+                        value={img.alt || ''}
+                        onChange={(e) => updateAltText(img.id, e.target.value)}
+                        className={`w-full rounded-lg border px-2.5 py-2 text-xs outline-none ${darkMode ? 'border-slate-700 bg-slate-950 text-slate-100 placeholder:text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-700 placeholder:text-slate-400'}`}
+                        placeholder="Describe the image"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => setLightbox(img)} className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Preview</button>
+                      <button type="button" onClick={() => openEditor(img)} className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Edit</button>
+                      <button type="button" onClick={() => openResize(img)} className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Resize</button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => generateAltTextFor(img.id)} className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5 text-[11px] font-medium text-violet-700">AI alt</button>
+                      <button type="button" onClick={() => navigator.clipboard.writeText(img.url)} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-700">Copy URL</button>
+                      <a href={img.url} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-700">Download</a>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {page < totalPages && (
+              <div className="mt-6 flex justify-center">
+                <button type="button" onClick={() => setPage(p => Math.min(p + 1, totalPages))} className="rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700 transition">
+                  Load more media
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {lightbox && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightbox(null)}>
+          <div className="relative w-full max-w-5xl rounded-2xl border border-slate-700 bg-slate-950 p-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => setLightbox(null)} className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white text-lg text-slate-900">×</button>
+            <div className="overflow-hidden rounded-xl bg-slate-900">
+              <img src={lightbox.url} alt={lightbox.alt || 'Preview image'} className="max-h-[80vh] w-full object-contain" />
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-base font-semibold text-white">{lightbox.filename}</p>
+                <p className="text-xs text-slate-400">{lightbox.productName}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => navigator.clipboard.writeText(lightbox.url)} className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200">Copy URL</button>
+                <a href={lightbox.url} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-medium text-slate-200">Open</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editImage && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">Edit alt text</h3>
+              <button type="button" onClick={() => setEditImage(null)} className="text-slate-400 hover:text-slate-700">×</button>
+            </div>
+            <img src={editImage.url} alt={editImage.alt || 'Edit preview'} className="h-52 w-full rounded-xl object-cover" />
+            <div className="mt-4 space-y-3">
+              <label className="block text-sm font-medium text-slate-700">Alt text</label>
+              <textarea
+                value={editImage.altDraft || ''}
+                onChange={(e) => setEditImage(prev => ({ ...prev, altDraft: e.target.value }))}
+                rows={4}
+                className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setEditImage(prev => ({ ...prev, altDraft: buildAltText(prev) }))} className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-medium text-violet-700">Generate</button>
+                <button type="button" onClick={saveEditedAlt} className="flex-1 rounded-lg bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-700">Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resizeTarget && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">Resize image</h3>
+              <button type="button" onClick={() => setResizeTarget(null)} className="text-slate-400 hover:text-slate-700">×</button>
+            </div>
+            <img src={resizeTarget.url} alt={resizeTarget.alt || 'Resize preview'} className="h-44 w-full rounded-xl object-cover" />
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[320, 640, 1024, 1280].map((size) => (
+                <button key={size} type="button" onClick={() => applyResize(resizeTarget, size)} className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">{size}px</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
