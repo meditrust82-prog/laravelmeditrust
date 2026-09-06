@@ -1033,7 +1033,8 @@ Generate the following in JSON format only, no markdown:
       toast.success('AI fields filled!');
     } catch (err) {
       console.error('AI fill error:', err);
-      toast.error(`AI fill failed: ${err.message}`);
+      const detail = err.response?.data?.error || err.message;
+      toast.error(`AI fill failed: ${detail}`);
     } finally {
       setAiFilling(false);
     }

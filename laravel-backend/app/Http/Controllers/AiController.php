@@ -15,12 +15,27 @@ class AiController extends Controller
             return null;
         }
 
+        $model = env('GROQ_MODEL', 'llama-3.1-8b-instant');
+
         $response = Http::withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
-            'model' => 'llama-3.3-70b-versatile',
+            'model' => $model,
             'messages' => $messages,
             'temperature' => $temperature,
             'max_tokens' => $maxTokens,
         ]);
+
+        if (!$response->successful() && $model !== 'llama-3.1-8b-instant') {
+            // Automatic fallback if specified model is unavailable/deprecated
+            $fallback = Http::withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
+                'model' => 'llama-3.1-8b-instant',
+                'messages' => $messages,
+                'temperature' => $temperature,
+                'max_tokens' => $maxTokens,
+            ]);
+            if ($fallback->successful()) {
+                return $fallback->json();
+            }
+        }
 
         if (!$response->successful()) {
             return ['error' => $response->json('error.message') ?: 'Groq error'];
