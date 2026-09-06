@@ -9,6 +9,21 @@ const CANDIDATE_MODELS = [
 
 const cleanKey = (key) => (key || '').trim().replace(/^["']+|["']+$/g, '');
 
+const modelPayload = (model, payload) => {
+  const options = { ...payload, model };
+  const reasoningEffort = process.env.GROQ_REASONING_EFFORT;
+
+  if (model.startsWith('openai/gpt-oss')) {
+    options.include_reasoning = false;
+    options.reasoning_effort = reasoningEffort || 'low';
+  } else if (model.startsWith('qwen/')) {
+    options.reasoning_effort = reasoningEffort || 'none';
+    options.reasoning_format = 'hidden';
+  }
+
+  return options;
+};
+
 const callGroqWithFallback = async (apiKey, payload) => {
   const token = cleanKey(apiKey);
   let lastError = 'Groq error';
@@ -19,7 +34,7 @@ const callGroqWithFallback = async (apiKey, payload) => {
       const response = await fetch(GROQ_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...payload, model }),
+        body: JSON.stringify(modelPayload(model, payload)),
       });
       const data = await response.json();
       if (response.ok && data.choices?.[0]) return { ok: true, data };
