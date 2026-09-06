@@ -156,7 +156,7 @@ export default function AiChat({ currentProduct = null }) {
         }),
       });
       const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || 'Sorry, I could not get a response. Please try again.';
+      const reply = data.choices?.[0]?.message?.content || data.error || 'Sorry, I could not get a response. Please try again.';
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error. Please try again.' }]);
