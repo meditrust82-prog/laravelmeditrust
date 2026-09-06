@@ -370,13 +370,37 @@ const BlogAdmin = () => {
     if (!prompt) { toast.error('Describe your blog topic first'); return; }
     setAiLoading(true);
     try {
-      const res = await api.post('/ai/blog-generate', {
-        prompt,
-        tone: aiTone,
-        audience: aiAudience.trim() || undefined,
-        instructions: aiInstructions.trim() || undefined,
-      });
-      const d = res.data || {};
+      let d;
+      try {
+        const res = await api.post('/ai/blog-generate', {
+          prompt,
+          tone: aiTone,
+          audience: aiAudience.trim() || undefined,
+          instructions: aiInstructions.trim() || undefined,
+        });
+        d = res.data || {};
+      } catch (error) {
+        // The legacy Render API exposes chat but not the newer blog endpoint.
+        if (error.response?.status !== 404) throw error;
+        const chatRes = await api.post('/ai/chat', {
+          messages: [
+            {
+              role: 'system',
+              content: 'Create a researched medical-equipment blog post for Meditrust Nepal. Return ONLY valid JSON with these keys: title, slug, excerpt, content (HTML using h2,h3,p,ul,ol,li,strong,em), category, tags (array), metaTitle, metaDesc, focusKeyword, secondaryKeywords (array), searchIntent, canonical, robots, ogTitle, ogDesc, primaryQuestion, directAnswer, keyTakeaways (array), country, locations (array), entities (array), targetAudience (array), faqs (array of objects with q and a), author, authorCredentials, authorBio, authorUrl, altText, caption, sources (array of objects with title,url,publisher,type). Use authoritative sources and never invent URLs, credentials, statistics, or medical claims. Leave unknown URLs blank.',
+            },
+            {
+              role: 'user',
+              content: `Topic: ${prompt}\nTone: ${aiTone}\nAudience: ${aiAudience.trim() || 'medical professionals and buyers in Nepal'}\nInstructions: ${aiInstructions.trim() || 'Write accurate, useful content with practical guidance and FAQs.'}`,
+            },
+          ],
+          temperature: 0.7,
+          max_tokens: 4000,
+        });
+        const text = chatRes.data?.choices?.[0]?.message?.content || '';
+        const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        d = JSON.parse(match?.[0] || cleaned);
+      }
       setFields({
         title: d.title || form.title,
         slug: d.slug || form.slug,
