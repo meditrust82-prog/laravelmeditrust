@@ -360,7 +360,13 @@ const BlogAdmin = () => {
   const saveDraft = () => persist(false);
 
   const aiGenerate = async () => {
-    const prompt = aiPrompt.trim();
+    const prompt = aiPrompt.trim()
+      || [
+        form.title.trim() && `Create a complete researched article about: ${form.title.trim()}`,
+        form.category.trim() && `Category: ${form.category.trim()}`,
+        form.tags.length && `Cover these topics: ${form.tags.join(', ')}`,
+        form.excerpt.trim() && `Context: ${form.excerpt.trim()}`,
+      ].filter(Boolean).join('\n');
     if (!prompt) { toast.error('Describe your blog topic first'); return; }
     setAiLoading(true);
     try {
