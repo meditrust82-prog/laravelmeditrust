@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 use App\Models\Product;
 
 class AiController extends Controller
@@ -15,33 +16,38 @@ class AiController extends Controller
             return null;
         }
 
-        $model = env('GROQ_MODEL', 'llama-3.1-8b-instant');
+        $models = array_values(array_unique([
+            env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+            'llama-3.1-8b-instant',
+            'llama3-8b-8192',
+        ]));
+        $errors = [];
 
-        $response = Http::withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
-            'model' => $model,
-            'messages' => $messages,
-            'temperature' => $temperature,
-            'max_tokens' => $maxTokens,
-        ]);
+        foreach ($models as $model) {
+            try {
+                $response = Http::withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
+                    'model' => $model,
+                    'messages' => $messages,
+                    'temperature' => $temperature,
+                    'max_tokens' => $maxTokens,
+                ]);
 
-        if (!$response->successful() && $model !== 'llama-3.1-8b-instant') {
-            // Automatic fallback if specified model is unavailable/deprecated
-            $fallback = Http::withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
-                'model' => 'llama-3.1-8b-instant',
-                'messages' => $messages,
-                'temperature' => $temperature,
-                'max_tokens' => $maxTokens,
-            ]);
-            if ($fallback->successful()) {
-                return $fallback->json();
+                if ($response->successful()) {
+                    return $response->json();
+                }
+
+                $errors[] = sprintf(
+                    '%s (%s): %s',
+                    $model,
+                    $response->status(),
+                    $response->json('error.message') ?: 'Groq request failed'
+                );
+            } catch (Throwable $exception) {
+                $errors[] = sprintf('%s: %s', $model, $exception->getMessage());
             }
         }
 
-        if (!$response->successful()) {
-            return ['error' => $response->json('error.message') ?: 'Groq error'];
-        }
-
-        return $response->json();
+        return ['error' => 'All Groq models failed: ' . implode(' | ', $errors)];
     }
 
     /** xAI Grok (OpenAI-compatible). Prefer XAI_API_KEY, fall back to GROK_API_KEY. */

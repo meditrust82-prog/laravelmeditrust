@@ -28,3 +28,5 @@ class HealthController extends Controller
         return response()->json(['status' => 'ok', 'version' => 'v1']);
     }
 
+}
+

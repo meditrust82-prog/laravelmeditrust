@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'react-toastify';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -156,10 +157,22 @@ export default function AiChat({ currentProduct = null }) {
         }),
       });
       const data = await res.json();
-      const reply = data.choices?.[0]?.message?.content || data.error || 'Sorry, I could not get a response. Please try again.';
+      if (!res.ok || data.error) {
+        const errorMessage = data.error || `AI service request failed (${res.status})`;
+        toast.error(errorMessage, { autoClose: 8000 });
+        throw new Error(errorMessage);
+      }
+      const reply = data.choices?.[0]?.message?.content;
+      if (!reply) {
+        const errorMessage = 'AI service returned no response.';
+        toast.error(errorMessage);
+        throw new Error(errorMessage);
+      }
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error. Please try again.' }]);
+    } catch (error) {
+      if (!error.message || error.message === 'Failed to fetch') {
+        toast.error('Connection error. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
