@@ -25,12 +25,21 @@ class AiController extends Controller
 
         foreach ($models as $model) {
             try {
-                $response = Http::withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', [
+                $payload = [
                     'model' => $model,
                     'messages' => $messages,
                     'temperature' => $temperature,
                     'max_tokens' => $maxTokens,
-                ]);
+                ];
+                if (str_starts_with($model, 'openai/gpt-oss')) {
+                    $payload['include_reasoning'] = false;
+                    $payload['reasoning_effort'] = env('GROQ_REASONING_EFFORT', 'low');
+                } elseif (str_starts_with($model, 'qwen/')) {
+                    $payload['reasoning_effort'] = env('GROQ_REASONING_EFFORT', 'none');
+                    $payload['reasoning_format'] = 'hidden';
+                }
+
+                $response = Http::withToken($apiKey)->post('https://api.groq.com/openai/v1/chat/completions', $payload);
 
                 if ($response->successful()) {
                     return $response->json();
