@@ -2,9 +2,9 @@ const Product = require('../models/Product');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const CANDIDATE_MODELS = [
-  process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-  'llama3-8b-8192',
+  process.env.GROQ_MODEL || 'qwen/qwen3.6-27b',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
 ];
 
 const cleanKey = (key) => (key || '').trim().replace(/^["']+|["']+$/g, '');
