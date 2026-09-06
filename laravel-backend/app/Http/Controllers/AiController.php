@@ -276,6 +276,7 @@ class AiController extends Controller
             'prompt' => ['required', 'string', 'min:5'],
             'tone' => ['nullable', 'string', 'max:120'],
             'audience' => ['nullable', 'string', 'max:200'],
+            'instructions' => ['nullable', 'string', 'max:2000'],
         ]);
 
         if (!env('GROQ_API_KEY') && !env('XAI_API_KEY') && !env('GROK_API_KEY')) {
@@ -284,6 +285,7 @@ class AiController extends Controller
 
         $tone = $data['tone'] ?? 'professional and helpful';
         $audience = $data['audience'] ?? 'medical professionals and buyers in Nepal';
+        $instructions = $data['instructions'] ?? 'Use accurate, helpful, customer-focused defaults.';
 
         $system = <<<'SYS'
 You are an expert medical-equipment content writer for Meditrust Nepal, an eCommerce platform for medical equipment in Nepal.
@@ -317,7 +319,8 @@ SYS;
 
         $user = 'Topic: ' . $data['prompt']
             . "\nTone: " . $tone
-            . "\nTarget audience: " . $audience;
+            . "\nTarget audience: " . $audience
+            . "\nCustom instructions: " . $instructions;
 
         $raw = $this->xaiCall([
             ['role' => 'system', 'content' => $system],

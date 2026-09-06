@@ -990,6 +990,7 @@ const ProductsSection = () => {
   };
 
   const [aiFilling, setAiFilling] = useState(false);
+  const [aiInstructions, setAiInstructions] = useState('');
   const handleAiFill = async () => {
     if (!form.name.trim()) { toast.error('Enter a product name first'); return; }
     setAiFilling(true);
@@ -1009,7 +1010,10 @@ Generate the following in JSON format only, no markdown:
   "keyTakeaways": ["3-4 key features or benefits"],
   "faqs": [{"q": "question", "a": "answer"}],
   "searchIntent": "transactional"
-}`;
+}
+
+Custom instructions from the admin:
+${aiInstructions.trim() || 'Use accurate, helpful, customer-focused defaults for Nepal.'}`;
       const res = await api.post('/ai/chat', { messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 600 });
       const data = res.data;
       if (!data.choices) throw new Error('AI service error');
@@ -1681,6 +1685,13 @@ Generate the following in JSON format only, no markdown:
                 {aiFilling ? '⏳ Filling...' : '✨ Auto-fill with AI'}
               </button>
             </div>
+            <textarea
+              value={aiInstructions}
+              onChange={(e) => setAiInstructions(e.target.value)}
+              rows={2}
+              placeholder="Optional custom instructions: emphasize home users, mention Kathmandu delivery, use a formal tone, include these FAQs..."
+              className="w-full mb-4 px-3 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none resize-y text-sm"
+            />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">URL Slug</label>

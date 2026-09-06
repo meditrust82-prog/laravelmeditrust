@@ -251,6 +251,7 @@ const BlogAdmin = () => {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiTone, setAiTone] = useState('professional and helpful');
   const [aiAudience, setAiAudience] = useState('');
+  const [aiInstructions, setAiInstructions] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
   // List filters
@@ -363,7 +364,12 @@ const BlogAdmin = () => {
     if (!prompt) { toast.error('Describe your blog topic first'); return; }
     setAiLoading(true);
     try {
-      const res = await api.post('/ai/blog-generate', { prompt, tone: aiTone, audience: aiAudience.trim() || undefined });
+      const res = await api.post('/ai/blog-generate', {
+        prompt,
+        tone: aiTone,
+        audience: aiAudience.trim() || undefined,
+        instructions: aiInstructions.trim() || undefined,
+      });
       const d = res.data || {};
       setFields({
         title: d.title || form.title,
@@ -573,6 +579,12 @@ const BlogAdmin = () => {
               onChange={(e) => setAiAudience(e.target.value)}
               className="text-sm px-2 py-1.5 border border-gray-200 rounded-lg flex-1 min-w-[160px]"
               placeholder="Target audience (e.g. clinic owners in Kathmandu)"
+            />
+            <input
+              value={aiInstructions}
+              onChange={(e) => setAiInstructions(e.target.value)}
+              className="text-sm px-2 py-1.5 border border-gray-200 rounded-lg flex-1 min-w-[220px]"
+              placeholder="Custom instructions (optional)"
             />
             <button
               onClick={aiGenerate}
