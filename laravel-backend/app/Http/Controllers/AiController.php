@@ -17,9 +17,9 @@ class AiController extends Controller
         }
 
         $models = array_values(array_unique([
-            env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
-            'llama-3.1-8b-instant',
-            'llama3-8b-8192',
+            env('GROQ_MODEL', 'qwen/qwen3.6-27b'),
+            'openai/gpt-oss-120b',
+            'openai/gpt-oss-20b',
         ]));
         $errors = [];
 
