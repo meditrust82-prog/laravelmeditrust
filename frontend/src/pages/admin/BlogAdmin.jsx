@@ -383,20 +383,34 @@ const BlogAdmin = () => {
         focusKeyword: d.focusKeyword || form.focusKeyword,
         secondaryKeywords: Array.isArray(d.secondaryKeywords) ? d.secondaryKeywords : form.secondaryKeywords,
         searchIntent: d.searchIntent || form.searchIntent,
+        canonical: d.canonical || form.canonical,
+        robots: d.robots || form.robots,
+        ogTitle: d.ogTitle || d.metaTitle || d.title || form.ogTitle,
+        ogDesc: d.ogDesc || d.metaDesc || d.excerpt || form.ogDesc,
         primaryQuestion: d.primaryQuestion || form.primaryQuestion,
         directAnswer: d.directAnswer || form.directAnswer,
         keyTakeaways: Array.isArray(d.keyTakeaways) ? d.keyTakeaways : form.keyTakeaways,
+        country: d.country || form.country,
+        locations: Array.isArray(d.locations) ? d.locations : form.locations,
+        entities: Array.isArray(d.entities) ? d.entities : form.entities,
+        targetAudience: Array.isArray(d.targetAudience) ? d.targetAudience : form.targetAudience,
         faqs: Array.isArray(d.faqs) ? d.faqs : form.faqs,
         author: d.author || form.author,
         authorCredentials: d.authorCredentials || form.authorCredentials,
         authorBio: d.authorBio || form.authorBio,
+        authorUrl: d.authorUrl || form.authorUrl,
+        altText: d.altText || form.altText,
+        caption: d.caption || form.caption,
         sources: Array.isArray(d.sources) ? d.sources : form.sources,
       });
       // If the content editor is mounted, push the HTML in directly.
       editorRef.current?.setContent?.(d.content || '');
       toast.success('Draft generated — review and publish');
     } catch (e) {
-      toast.error(e.response?.data?.error || 'AI generation failed');
+      const message = e.response?.status === 404
+        ? 'AI draft route not found. Check that the backend API is running and VITE_API_URL is correct.'
+        : e.response?.data?.error || 'AI generation failed';
+      toast.error(message);
     } finally {
       setAiLoading(false);
     }
@@ -587,6 +601,7 @@ const BlogAdmin = () => {
               placeholder="Custom instructions (optional)"
             />
             <button
+              type="button"
               onClick={aiGenerate}
               disabled={aiLoading}
               className="ml-auto text-sm px-4 py-2 rounded-lg bg-primary-600 text-white font-semibold hover:bg-primary-700 disabled:opacity-60 flex items-center gap-2"

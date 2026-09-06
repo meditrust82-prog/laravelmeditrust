@@ -267,7 +267,7 @@ class AiController extends Controller
     }
 
     /**
-     * Generate a full blog post (title, content, SEO, AEO, FAQs, author…) from a
+         * Generate a full blog post (title, content, SEO, AEO, FAQs, author…) from a
      * topic description, structured to match the Meditrust blog schema.
      */
     public function generateBlog(Request $req)
@@ -300,21 +300,32 @@ Given a topic description, write a complete, well-structured blog post. Return O
   "category": "a short category name",
   "tags": ["4-6 short tags"],
   "metaTitle": "SEO title, 60 chars max",
-  "metaDesc": "meta description, 155 chars max",
+    "metaDesc": "meta description, 155 chars max",
+    "canonical": "blank unless a canonical URL is explicitly known",
+    "robots": "index,follow",
+    "ogTitle": "Open Graph title",
+    "ogDesc": "Open Graph description",
   "focusKeyword": "primary keyword phrase",
   "secondaryKeywords": ["2-4 related keyword phrases"],
   "searchIntent": "one of: informational, commercial, transactional, navigational",
   "primaryQuestion": "the main question the article answers",
   "directAnswer": "40-80 word direct answer suitable for a featured snippet",
   "keyTakeaways": ["4-5 key takeaways"],
+    "country": "primary country or market",
+    "locations": ["relevant cities or local areas"],
+    "entities": ["important related entities and concepts"],
+    "targetAudience": ["specific audience segments"],
   "faqs": [{"q": "question", "a": "answer"}],
   "author": "Meditrust Nepal",
   "authorCredentials": "short author credential line",
   "authorBio": "1-2 sentence author bio",
+    "authorUrl": "blank unless a verified author profile URL is known",
+    "altText": "descriptive featured-image alt text",
+    "caption": "short factual featured-image caption",
   "sources": [{"title": "source title", "url": "https://...", "publisher": "publisher name", "type": "guideline|study|standard"}]
 }
 
-Keep the content factual and general. Do not invent specific prices, stock, or unverifiable medical claims. Write in the requested tone for the requested audience.
+Research the topic using your learned medical and consumer-health knowledge. Cite several authoritative, relevant sources that genuinely support the article; never invent a URL, study, organization, author, credential, reviewer, or statistic. Leave canonical, authorUrl, reviewer fields, and image URLs blank when they cannot be verified. Do not invent specific prices, stock, or unverifiable medical claims. Write in the requested tone for the requested audience.
 SYS;
 
         $user = 'Topic: ' . $data['prompt']
