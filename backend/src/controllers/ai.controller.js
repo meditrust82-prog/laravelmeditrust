@@ -1,7 +1,7 @@
 const Product = require('../models/Product');
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.3-70b-versatile';
+const MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 
 const groqCall = async (apiKey, messages, max_tokens = 800, temperature = 0.5) => {
   const r = await fetch(GROQ_URL, {
