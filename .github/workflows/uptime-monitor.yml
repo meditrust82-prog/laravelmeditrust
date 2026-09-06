@@ -1,0 +1,22 @@
+name: Uptime Monitor & Keep-Alive
+
+on:
+  schedule:
+    # Ping every 10 minutes to keep Render awake and monitor uptime
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-backend:
+    name: Ping Backend Health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send keep-alive request to Render backend
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 45 https://medi-b5ps.onrender.com/api/health)
+          echo "Health check HTTP status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "Backend is alive and responsive."
+          else
+            echo "::warning::Backend check returned status $HTTP_STATUS"
+          fi
