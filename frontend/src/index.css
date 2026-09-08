@@ -18,13 +18,13 @@
 }
 
 .dark {
-  --bg-primary:   #121212;
-  --bg-secondary: #1E1E1E;
-  --bg-card:      #252525;
+  --bg-primary:   #10212B;
+  --bg-secondary: #172C38;
+  --bg-card:      #203846;
   --text-primary: #F9FAFB;
-  --text-muted:   #9CA3AF;
-  --border:       #374151;
-  --scrollbar-track: #1E1E1E;
+  --text-muted:   #A8BAC3;
+  --border:       #35515E;
+  --scrollbar-track: #172C38;
   --scrollbar-thumb: #06B6D4;
 }
 

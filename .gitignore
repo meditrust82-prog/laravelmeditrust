@@ -53,3 +53,14 @@ attached_assets/
 
 # Uploads
 uploads/
+
+# Laravel runtime cache & views
+laravel-backend/storage/framework/views/*
+!laravel-backend/storage/framework/views/.gitignore
+laravel-backend/storage/framework/cache/*
+!laravel-backend/storage/framework/cache/.gitignore
+laravel-backend/storage/framework/sessions/*
+!laravel-backend/storage/framework/sessions/.gitignore
+laravel-backend/bootstrap/cache/*
+!laravel-backend/bootstrap/cache/.gitignore
+

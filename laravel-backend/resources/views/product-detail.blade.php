@@ -1,12 +1,74 @@
 @extends('layouts.app')
 
-@section('title', ($productData['product']['name'] ?? 'Product Not Found') . ' | Meditrust Nepal')
+@php
+    $product = $productData['product'] ?? $productData;
+    $relatedProducts = $productData['relatedProducts'] ?? [];
+    $slug = $product['slug'] ?? $product['_id'] ?? $product['id'] ?? null;
+    $name = $product['name'] ?? 'Unknown Product';
+    $price = isset($product['price']) ? (float)$product['price'] : 0;
+    $originalPrice = isset($product['originalPrice']) ? (float)$product['originalPrice'] : 0;
+    $category = $product['category'] ?? 'Medical Equipment';
+    $images = $product['allImages'] ?? $product['images'] ?? [];
+    if (empty($images) && !empty($product['image'])) {
+        $images = [$product['image']];
+    }
+    $mainImage = $images[0]['url'] ?? $images[0] ?? $product['image'] ?? null;
+    $description = $product['description'] ?? '<p>No description available.</p>';
+    $metaTitle = $product['metaTitle'] ?? $product['meta_title'] ?? ($name . ' — Buy in Nepal | Meditrust Nepal');
+    $rawDesc = $product['metaDescription'] ?? $product['meta_description'] ?? strip_tags($description);
+    $metaDesc = mb_substr(trim(preg_replace('/\s+/', ' ', html_entity_decode((string)$rawDesc, ENT_QUOTES | ENT_HTML5, 'UTF-8'))), 0, 160) ?: "Buy {$name} from Meditrust Nepal. CE & ISO certified, competitive pricing, 24/7 support.";
+    $canonicalUrl = 'https://meditrustnepal.com/products/' . ($slug ?: '');
+    $socialImg = is_array($mainImage) ? ($mainImage['url'] ?? '') : $mainImage;
+    if ($socialImg) {
+        if (str_contains($socialImg, 'res.cloudinary.com')) {
+            $socialImg = preg_replace('/\/upload\/(?:[a-zA-Z0-9_:,]+\/)?/', '/upload/f_jpg,q_auto,w_1200,h_630,c_pad,b_white/', $socialImg, 1);
+        } elseif (!str_starts_with($socialImg, 'http')) {
+            $socialImg = 'https://meditrustnepal.com/' . ltrim($socialImg, '/');
+        }
+    } else {
+        $socialImg = 'https://meditrustnepal.com/logo.png';
+    }
+@endphp
+
+@section('title', ($name ?: 'Product') . ' | Meditrust Nepal')
+
+@section('meta')
+@if ($product)
+    <link rel="canonical" href="{{ $canonicalUrl }}" />
+    <meta property="og:type" content="product" />
+    <meta property="og:title" content="{{ $metaTitle }}" />
+    <meta property="og:description" content="{{ $metaDesc }}" />
+    <meta property="og:url" content="{{ $canonicalUrl }}" />
+    <meta property="og:image" content="{{ $socialImg }}" />
+    <meta property="og:image:secure_url" content="{{ $socialImg }}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{ $metaTitle }}" />
+    <meta name="twitter:description" content="{{ $metaDesc }}" />
+    <meta name="twitter:image" content="{{ $socialImg }}" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "@id": "{{ $canonicalUrl }}#product",
+      "name": {{ json_encode($name) }},
+      "description": {{ json_encode($metaDesc) }},
+      "image": [{{ json_encode($socialImg) }}],
+      "offers": {
+        "@type": "Offer",
+        "url": "{{ $canonicalUrl }}",
+        "priceCurrency": "NPR",
+        "price": {{ $price ?: 0 }},
+        "availability": "https://schema.org/InStock"
+      }
+    }
+    </script>
+@endif
+@endsection
 
 @section('content')
-@php
-    $product = $productData['product'] ?? null;
-    $relatedProducts = $productData['relatedProducts'] ?? [];
-@endphp
 
 <section class="py-6 sm:py-12 bg-gray-50 dark:bg-dark-surface min-h-screen">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -116,8 +178,12 @@
                                     <span id="product-qty" class="w-12 text-center text-gray-900 font-semibold dark:text-white">1</span>
                                     <button type="button" class="px-3 h-full text-gray-600 hover:bg-gray-100 transition-colors font-bold" data-action="increase-qty">+</button>
                                 </div>
-                                <button type="button" data-action="add-cart" class="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md">
+                                <button type="button" data-action="add-cart" class="flex-1 min-w-[140px] h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md">
                                     🛒 Add to Quote
+                                </button>
+                                <button type="button" id="product-share-btn" class="h-12 px-4 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl flex items-center justify-center gap-2 transition-all dark:border-dark-border dark:text-gray-300 dark:hover:bg-gray-800 shadow-sm" title="Share this product">
+                                    <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                                    <span>Share</span>
                                 </button>
                                 <button type="button" data-action="toggle-wishlist" class="h-12 px-4 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl flex items-center justify-center transition-all dark:border-dark-border dark:text-gray-300 dark:hover:bg-gray-800" title="Add to Wishlist">
                                     Wishlist
@@ -163,6 +229,29 @@
             <!-- Recently Viewed Section (Rendered by JS) -->
             <div id="recently-viewed-list"></div>
 
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var shareBtn = document.getElementById('product-share-btn');
+                if (!shareBtn) return;
+                shareBtn.addEventListener('click', async function() {
+                    var url = window.location.href;
+                    var title = @json($name);
+                    var text = @json($name . ' — ' . $metaDesc);
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({ title: title, text: text, url: url });
+                            return;
+                        } catch(e) {}
+                    }
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        alert('Product link copied to clipboard!');
+                    } catch(e) {
+                        prompt('Copy product link:', url);
+                    }
+                });
+            });
+            </script>
         @endif
     </div>
 </section>

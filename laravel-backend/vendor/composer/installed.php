@@ -1,13 +1,13 @@
 <?php return array(
     'root' => array(
         'name' => 'medi/laravel-backend',
-        'pretty_version' => '1.0.0+no-version-set',
-        'version' => '1.0.0.0',
-        'reference' => null,
+        'pretty_version' => 'dev-main',
+        'version' => 'dev-main',
+        'reference' => 'fcac14c2357337b9993e3e1d1e6b0b36c3caac23',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
-        'dev' => true,
+        'dev' => false,
     ),
     'versions' => array(
         'brick/math' => array(
@@ -452,9 +452,9 @@
             'dev_requirement' => false,
         ),
         'medi/laravel-backend' => array(
-            'pretty_version' => '1.0.0+no-version-set',
-            'version' => '1.0.0.0',
-            'reference' => null,
+            'pretty_version' => 'dev-main',
+            'version' => 'dev-main',
+            'reference' => 'fcac14c2357337b9993e3e1d1e6b0b36c3caac23',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

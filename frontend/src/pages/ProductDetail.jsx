@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import SeoHead, { buildProductSchema, buildBreadcrumbSchema, buildProductFAQSchema } from '../components/SeoHead';
 import AIRecommendations from '../components/AIRecommendations';
@@ -12,7 +12,7 @@ import { useWishlist } from '../contexts/WishlistContext';
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { useWhatsApp } from '../contexts/WhatsAppContext';
-import { optimizeCloudinaryUrl, cloudinaryPlaceholder } from '../utils/cloudinary';
+import { optimizeCloudinaryUrl, cloudinaryPlaceholder, getSocialImageUrl } from '../utils/cloudinary';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -26,11 +26,14 @@ const ProductDetail = () => {
   const [qty, setQty] = useState(1);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showActionShareMenu, setShowActionShareMenu] = useState(false);
   const [quoteForm, setQuoteForm] = useState({
     name: '', hospitalName: '', phone: '', email: '', message: '', productName: ''
   });
   const [submitting, setSubmitting] = useState(false);
   const imageRef = useRef(null);
+  const shareMenuRef = useRef(null);
+  const actionShareMenuRef = useRef(null);
   const { addToCart } = useCart();
   const { toggleCompare, compareList } = useCompare();
   const { toggle: toggleWishlist, isWishlisted } = useWishlist();
@@ -38,12 +41,33 @@ const ProductDetail = () => {
   const { t, i18n } = useTranslation();
   const { setProductName } = useWhatsApp();
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
-  const shareText = product ? `Check out ${product.name} on Meditrust Nepal` : '';
+  const cleanDescription = useMemo(() => {
+    if (!product) return '';
+    if (product.metaDescription) return product.metaDescription;
+    if (product.description) {
+      const stripped = product.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      return stripped.length > 160 ? stripped.slice(0, 157) + '...' : stripped;
+    }
+    return `Buy ${product.name} from Meditrust Nepal. CE & ISO certified, competitive pricing, and 24/7 technical support across Nepal.`;
+  }, [product]);
+
+  const shareUrl = typeof window !== 'undefined'
+    ? (product?.slug ? `${window.location.origin}/products/${product.slug}` : window.location.href)
+    : '';
+
+  const shareText = product
+    ? `${product.name} — ${cleanDescription}`
+    : '';
 
   const handleShare = async () => {
     if (navigator.share) {
-      try { await navigator.share({ title: product?.name, text: shareText, url: shareUrl }); } catch {}
+      try {
+        await navigator.share({
+          title: product?.name,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch {}
     } else {
       try {
         await navigator.clipboard.writeText(shareUrl);
@@ -53,11 +77,12 @@ const ProductDetail = () => {
       }
     }
     setShowShareMenu(false);
+    setShowActionShareMenu(false);
   };
 
   const shareLinks = [
+    { label: 'WhatsApp', icon: FaWhatsapp, className: 'bg-[#25d366]', href: `https://wa.me/?text=${encodeURIComponent(`${shareText}\n${shareUrl}`)}` },
     { label: 'Facebook', icon: FaFacebookF, className: 'bg-[#1877f2]', href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}` },
-    { label: 'WhatsApp', icon: FaWhatsapp, className: 'bg-[#25d366]', href: `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}` },
     { label: 'X', icon: FaTwitter, className: 'bg-black', href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}` },
     { label: 'LinkedIn', icon: FaLinkedinIn, className: 'bg-[#0a66c2]', href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}` },
   ];
@@ -67,10 +92,30 @@ const ProductDetail = () => {
       await navigator.clipboard.writeText(shareUrl);
       toast.success('Product link copied!', { autoClose: 1500 });
       setShowShareMenu(false);
+      setShowActionShareMenu(false);
     } catch {
       toast.error('Unable to copy link. Please copy the URL from your browser.');
     }
   };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target)) {
+        setShowShareMenu(false);
+      }
+      if (actionShareMenuRef.current && !actionShareMenuRef.current.contains(e.target)) {
+        setShowActionShareMenu(false);
+      }
+    };
+    if (showShareMenu || showActionShareMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showShareMenu, showActionShareMenu]);
 
   const isComparing = (id) => compareList.some(p => p.id === id);
 
@@ -210,18 +255,18 @@ const ProductDetail = () => {
 
   const rawImages = product.allImages || (product.image ? [product.image] : []);
   const images = rawImages.map(u => optimizeCloudinaryUrl(u, { width: 800 }));
-  const socialImage = optimizeCloudinaryUrl(rawImages[0], { width: 1200, height: 630 }) || undefined;
+  const socialImage = getSocialImageUrl(product.ogImage || rawImages[0]) || undefined;
   const currentImage = images[selectedImage] || null;
 
   return (
     <>
       <SeoHead
         title={product.metaTitle || `${product.name} — Buy in Nepal`}
-        description={product.metaDescription || product.description?.substring(0, 160) || `Buy ${product.name} from Meditrust Nepal. CE & ISO certified, competitive pricing, and 24/7 technical support across Nepal.`}
+        description={cleanDescription}
         image={socialImage || images[0] || undefined}
         ogTitle={product.ogTitle || undefined}
-        ogDesc={product.ogDesc || undefined}
-        ogImage={product.ogImage || socialImage || undefined}
+        ogDesc={cleanDescription}
+        ogImage={socialImage || undefined}
         type="product"
         keywords={product.metaKeywords || `${product.name}, ${product.category || 'medical equipment'} Nepal, buy ${product.name} Kathmandu, ${product.brand ? product.brand + ' Nepal' : 'medical equipment Nepal'}`}
         canonical={product.slug ? `/products/${product.slug}` : undefined}
@@ -348,12 +393,13 @@ const ProductDetail = () => {
                 dangerouslySetInnerHTML={{ __html: product.description }}
               />
 
-              {/* Quantity and Add to Cart */}
-              <div className="flex items-center gap-4 mb-6">
-                <div className="flex items-center border border-gray-300 dark:border-dark-border rounded-lg bg-white dark:bg-dark-card overflow-hidden">
+              {/* Quantity, Add to Cart & Share */}
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 mb-6">
+                <div className="flex items-center border border-gray-300 dark:border-dark-border rounded-lg bg-white dark:bg-dark-card overflow-hidden flex-shrink-0">
                   <button
                     onClick={() => setQty(q => Math.max(1, q - 1))}
                     className="px-3 py-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
+                    aria-label="Decrease quantity"
                   >
                     <FaMinus className="text-xs" />
                   </button>
@@ -361,16 +407,72 @@ const ProductDetail = () => {
                   <button
                     onClick={() => setQty(q => q + 1)}
                     className="px-3 py-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
+                    aria-label="Increase quantity"
                   >
                     <FaPlus className="text-xs" />
                   </button>
                 </div>
                 <button
                   onClick={() => addToCart(product, qty)}
-                  className="flex-1 bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 min-w-[150px] bg-primary-600 text-white py-3 px-5 rounded-lg font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2 shadow-sm"
                 >
                   <FaShoppingCart /> {t('Add_To_Cart_Label')}
                 </button>
+                <div className="relative" ref={shareMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowShareMenu(prev => !prev)}
+                    className="h-full py-3 px-4 rounded-lg font-semibold border border-gray-300 dark:border-dark-border text-gray-700 dark:text-gray-200 bg-white dark:bg-dark-card hover:bg-gray-50 dark:hover:bg-dark-surface transition-all flex items-center justify-center gap-2 shadow-sm hover:border-primary-500 flex-shrink-0"
+                    title="Share this product"
+                    aria-label="Share this product"
+                    aria-expanded={showShareMenu}
+                  >
+                    <FaShareAlt className="text-primary-600 dark:text-brand-cyan" />
+                    <span className="text-sm font-medium">Share</span>
+                  </button>
+                  {showShareMenu && (
+                    <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-card p-2 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-dark-border mb-1">
+                        Share Product
+                      </div>
+                      {typeof navigator !== 'undefined' && navigator.share && (
+                        <button
+                          type="button"
+                          onClick={handleShare}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-primary-50 dark:hover:bg-dark-surface hover:text-primary-600 transition-colors"
+                        >
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-brand-cyan"><FaShareAlt className="text-xs" /></span>
+                          Share via Device...
+                        </button>
+                      )}
+                      {shareLinks.map(({ label, icon: Icon, className, href }) => (
+                        <a
+                          key={label}
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => setShowShareMenu(false)}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
+                        >
+                          <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs text-white ${className}`}>
+                            <Icon />
+                          </span>
+                          Share on {label}
+                        </a>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={copyShareLink}
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-surface border-t border-gray-100 dark:border-dark-border mt-1 pt-2 transition-colors"
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                          <FaLink className="text-xs" />
+                        </span>
+                        Copy Product Link
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Specifications */}
@@ -442,27 +544,29 @@ const ProductDetail = () => {
                 >
                   {isWishlisted(product.slug) ? <FaHeart /> : <FaRegHeart />}
                 </button>
-                <div className="relative">
+                <div className="relative" ref={actionShareMenuRef}>
                   <button
-                    onClick={() => setShowShareMenu(prev => !prev)}
+                    onClick={() => setShowActionShareMenu(prev => !prev)}
                     className="border border-gray-300 px-4 py-3 rounded-lg font-semibold text-gray-500 hover:bg-gray-50 transition-all flex items-center gap-2"
                     title="Share this product"
                     aria-label="Share this product"
-                    aria-expanded={showShareMenu}
+                    aria-expanded={showActionShareMenu}
                   >
                     <FaShareAlt />
                   </button>
-                  {showShareMenu && (
-                    <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-xl">
-                      <button onClick={handleShare} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
-                        <FaShareAlt className="text-primary-600" /> Share from your device
-                      </button>
+                  {showActionShareMenu && (
+                    <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-card p-2 shadow-xl">
+                      {typeof navigator !== 'undefined' && navigator.share && (
+                        <button onClick={handleShare} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-surface">
+                          <FaShareAlt className="text-primary-600" /> Share from your device
+                        </button>
+                      )}
                       {shareLinks.map(({ label, icon: Icon, className, href }) => (
-                        <a key={label} href={href} target="_blank" rel="noopener noreferrer" onClick={() => setShowShareMenu(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                          <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs text-white ${className}`}><Icon /></span>{label}
+                        <a key={label} href={href} target="_blank" rel="noopener noreferrer" onClick={() => setShowActionShareMenu(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-surface">
+                          <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs text-white ${className}`}><Icon /></span>Share on {label}
                         </a>
                       ))}
-                      <button onClick={copyShareLink} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                      <button onClick={copyShareLink} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-dark-surface border-t border-gray-100 dark:border-dark-border mt-1 pt-2">
                         <FaLink className="text-gray-500" /> Copy product link
                       </button>
                     </div>
@@ -606,11 +710,11 @@ const ProductDetail = () => {
           )}
 
           {/* Bottom share bar for direct product links */}
-          <div className="mt-12 border-t border-gray-200 py-8">
+          <div className="mt-12 border-t border-gray-200 dark:border-dark-border py-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Share this product</h2>
-                <p className="mt-1 text-sm text-gray-500">Send this product page to your team or customers.</p>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Share this product</h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Send this product page to your team or customers.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {shareLinks.map(({ label, icon: Icon, className, href }) => (
@@ -629,7 +733,7 @@ const ProductDetail = () => {
                   onClick={copyShareLink}
                   aria-label="Copy product link"
                   title="Copy product link"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-50"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 dark:border-dark-border text-gray-600 dark:text-gray-300 transition-colors hover:bg-gray-50 dark:hover:bg-dark-card"
                 >
                   <FaLink />
                 </button>
@@ -637,7 +741,7 @@ const ProductDetail = () => {
                   onClick={handleShare}
                   aria-label="Share product from your device"
                   title="Share from your device"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary-200 text-primary-600 transition-colors hover:bg-primary-50"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary-200 dark:border-primary-800 text-primary-600 dark:text-brand-cyan transition-colors hover:bg-primary-50 dark:hover:bg-dark-card"
                 >
                   <FaShareAlt />
                 </button>

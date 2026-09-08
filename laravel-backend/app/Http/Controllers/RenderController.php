@@ -47,6 +47,7 @@ class RenderController extends Controller
   <meta property=\"og:url\" content=\"{$canonical}\"/>
   <meta property=\"og:image\" content=\"{$ogImage}\"/>
   <meta property=\"og:image:secure_url\" content=\"{$ogImage}\"/>
+  <meta property=\"og:image:type\" content=\"image/jpeg\"/>
   <meta property=\"og:image:alt\" content=\"{$ogTitle}\"/>
   <meta property=\"og:image:width\" content=\"1200\"/>
   <meta property=\"og:image:height\" content=\"630\"/>
@@ -72,14 +73,22 @@ class RenderController extends Controller
 
     protected function stripHtml(?string $html): string
     {
-        return mb_substr(trim(strip_tags((string) $html)), 0, 300);
+        $clean = strip_tags((string) $html);
+        $clean = html_entity_decode($clean, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $clean = preg_replace('/\s+/', ' ', $clean);
+        return mb_substr(trim($clean), 0, 200);
     }
 
     protected function productImages(Product $product): array
     {
-        return collect($product->images ?? [])
+        $raw = $product->images;
+        if (empty($raw) && !empty($product->image)) {
+            $raw = [$product->image];
+        }
+        return collect($raw ?? [])
             ->map(fn ($image) => is_array($image) ? ($image['url'] ?? $image['path'] ?? null) : $image)
-            ->filter(fn ($image) => is_string($image) && str_starts_with($image, 'http'))
+            ->filter(fn ($image) => is_string($image) && !empty($image))
+            ->map(fn ($image) => str_starts_with($image, 'http') ? $image : ($this->site . '/' . ltrim($image, '/')))
             ->values()
             ->all();
     }
@@ -171,9 +180,16 @@ class RenderController extends Controller
                 . ($price ? '<p>Price: NRS ' . number_format($price) . '</p>' : '')
                 . ($product->brand ? '<p>Brand: ' . $this->escape($product->brand) . '</p>' : '')
                 . '<p><a href="' . $this->site . '/products">Back to all products</a></p>';
-            $ogImage = $product->og_image ?: ($images[0] ?? ($this->site . '/logo.png'));
-            if (!str_starts_with($ogImage, 'http')) {
-                $ogImage = $this->site . '/' . ltrim($ogImage, '/');
+            $primaryImage = $images[0] ?? ($product->image ?: null);
+            $ogImage = $product->og_image ?: $primaryImage;
+            if ($ogImage) {
+                if (str_contains($ogImage, 'res.cloudinary.com')) {
+                    $ogImage = preg_replace('/\/upload\/(?:[a-zA-Z0-9_:,]+\/)?/', '/upload/f_jpg,q_auto,w_1200,h_630,c_pad,b_white/', $ogImage, 1);
+                } elseif (!str_starts_with($ogImage, 'http')) {
+                    $ogImage = $this->site . '/' . ltrim($ogImage, '/');
+                }
+            } else {
+                $ogImage = $this->site . '/logo.png';
             }
 
             return $this->htmlResponse($this->shell([

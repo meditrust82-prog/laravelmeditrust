@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>@yield('title', $title ?? config('app.name', 'Meditrust Nepal'))</title>
     <meta name="description" content="{{ $description ?? 'Meditrust Nepal is your trusted medical equipment provider in Nepal.' }}">
+    @yield('meta')
     <link rel="stylesheet" href="/css/app.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>

@@ -43,17 +43,21 @@ const SeoHead = ({
 
   // Social-share overrides (Open Graph / Twitter). Fall back to regular title/description/image.
   const socialTitle = ogTitle ? `${ogTitle} | ${SITE_NAME}` : fullTitle;
-  const socialDesc = ogDesc || description;
+  const rawSocialDesc = ogDesc || description;
+  const socialDesc = typeof rawSocialDesc === 'string'
+    ? rawSocialDesc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    : DEFAULT_DESCRIPTION;
   const socialImage = ogImage
     ? (ogImage.startsWith('http') ? ogImage : `${SITE_URL}${ogImage}`)
     : resolvedImage;
+  const imageType = socialImage.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
 
   return (
     <Helmet>
       {/* ── Core ─────────────────────────────────────────────── */}
       <html lang={lang} />
       <title>{fullTitle}</title>
-      <meta name="description" content={description} />
+      <meta name="description" content={socialDesc} />
       <meta name="keywords" content={keywords} />
       <link rel="canonical" href={canonical} />
       <link rel="alternate" hrefLang="en" href={canonical} />
@@ -71,6 +75,7 @@ const SeoHead = ({
       <meta property="og:url" content={canonical} />
       <meta property="og:image" content={socialImage} />
       <meta property="og:image:secure_url" content={socialImage} />
+      <meta property="og:image:type" content={imageType} />
       <meta property="og:image:alt" content={socialTitle} />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
@@ -200,22 +205,24 @@ export const buildBreadcrumbSchema = (items) => ({
 });
 
 export const buildProductSchema = (product, { aggregateRating } = {}) => {
-  const images = (product.images || []).map(img => {
-    const src = img.path || img.url || img;
-    return typeof src === 'string' && src.startsWith('http') ? src : `${SITE_URL}${src}`;
+  const rawList = product.allImages || product.images || (product.image ? [product.image] : []);
+  const images = (Array.isArray(rawList) ? rawList : [rawList]).map(img => {
+    const src = typeof img === 'object' && img !== null ? (img.path || img.url) : img;
+    return typeof src === 'string' && src.startsWith('http') ? src : (src ? `${SITE_URL}${src}` : null);
   }).filter(Boolean);
 
   const slug = product.slug || product.id;
   const productUrl = `${SITE_URL}/products/${slug}`;
+  const cleanDesc = product.metaDescription
+    || (product.description ? product.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500) : '')
+    || `High-quality ${product.name} available from Meditrust Nepal.`;
 
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     '@id': `${productUrl}#product`,
     name: product.name,
-    description: product.description
-      ? product.description.replace(/<[^>]*>/g, '').slice(0, 500)
-      : `High-quality ${product.name} available from Meditrust Nepal.`,
+    description: cleanDesc,
     image: images.length > 0 ? images : [`${SITE_URL}/logo.png`],
     brand: product.brand ? { '@type': 'Brand', name: product.brand } : undefined,
     sku: `MN-${product.slug || product.id}`,

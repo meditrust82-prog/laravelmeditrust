@@ -14,11 +14,11 @@ export default {
           'red-d':  '#C53030',
         },
         dark: {
-          bg:      '#121212',
-          surface: '#1E1E1E',
-          card:    '#252525',
-          border:  '#374151',
-          muted:   '#9CA3AF',
+          bg:      '#10212B',
+          surface: '#172C38',
+          card:    '#203846',
+          border:  '#35515E',
+          muted:   '#A8BAC3',
         },
         primary: {
           50:  '#ecfeff',

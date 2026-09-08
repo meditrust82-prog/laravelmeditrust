@@ -153,9 +153,12 @@ const Products = () => {
 
   const handleShareProduct = async (product) => {
     const productUrl = `${window.location.origin}/products/${product.slug || product.id}`;
+    const descLine = product.metaDescription
+      || (product.description ? product.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 150) : '')
+      || `High-quality ${product.name} from Meditrust Nepal.`;
     const shareData = {
       title: product.name,
-      text: `Check out ${product.name} on Meditrust Nepal`,
+      text: `${product.name} — ${descLine}`,
       url: productUrl,
     };
 
