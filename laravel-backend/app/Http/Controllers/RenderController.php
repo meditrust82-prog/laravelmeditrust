@@ -46,6 +46,10 @@ class RenderController extends Controller
   <meta property=\"og:description\" content=\"{$ogDesc}\"/>
   <meta property=\"og:url\" content=\"{$canonical}\"/>
   <meta property=\"og:image\" content=\"{$ogImage}\"/>
+  <meta property=\"og:image:secure_url\" content=\"{$ogImage}\"/>
+  <meta property=\"og:image:alt\" content=\"{$ogTitle}\"/>
+  <meta property=\"og:image:width\" content=\"1200\"/>
+  <meta property=\"og:image:height\" content=\"630\"/>
   <meta property=\"og:type\" content=\"{$ogType}\"/>
   <meta property=\"og:site_name\" content=\"{$this->escape($this->siteName)}\"/>
   <meta property=\"og:locale\" content=\"en_US\"/>
@@ -54,15 +58,16 @@ class RenderController extends Controller
   <meta name=\"twitter:title\" content=\"{$ogTitle}\"/>
   <meta name=\"twitter:description\" content=\"{$ogDesc}\"/>
   <meta name=\"twitter:image\" content=\"{$ogImage}\"/>
+  <meta name=\"twitter:image:alt\" content=\"{$ogTitle}\"/>
   <meta name=\"robots\" content=\"index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1\"/>
   <meta name=\"geo.region\" content=\"NP\"/>
   <meta name=\"geo.placename\" content=\"Kathmandu, Nepal\"/>
   {$schemas}
-</head>
-<body>
-{$body}
-</body>
-</html>";
+  </head>
+  <body>
+  {$body}
+  </body>
+  </html>";
     }
 
     protected function stripHtml(?string $html): string
@@ -166,6 +171,10 @@ class RenderController extends Controller
                 . ($price ? '<p>Price: NRS ' . number_format($price) . '</p>' : '')
                 . ($product->brand ? '<p>Brand: ' . $this->escape($product->brand) . '</p>' : '')
                 . '<p><a href="' . $this->site . '/products">Back to all products</a></p>';
+            $ogImage = $product->og_image ?: ($images[0] ?? ($this->site . '/logo.png'));
+            if (!str_starts_with($ogImage, 'http')) {
+                $ogImage = $this->site . '/' . ltrim($ogImage, '/');
+            }
 
             return $this->htmlResponse($this->shell([
                 'title' => $product->meta_title ?: ($product->name . ' — Buy in Nepal | ' . $this->siteName),
@@ -175,7 +184,7 @@ class RenderController extends Controller
                 'ogType' => 'product',
                 'ogTitle' => $product->og_title ?: null,
                 'ogDesc' => $product->og_desc ?: null,
-                'ogImage' => $product->og_image ?: null,
+                'ogImage' => $ogImage,
                 'schemas' => [$productSchema, $breadcrumb, $faq],
                 'body' => $body,
             ]));

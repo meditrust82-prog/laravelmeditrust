@@ -70,6 +70,8 @@ const SeoHead = ({
       <meta property="og:description" content={socialDesc} />
       <meta property="og:url" content={canonical} />
       <meta property="og:image" content={socialImage} />
+      <meta property="og:image:secure_url" content={socialImage} />
+      <meta property="og:image:alt" content={socialTitle} />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="630" />
       <meta property="og:site_name" content={SITE_NAME} />
@@ -81,6 +83,7 @@ const SeoHead = ({
       <meta name="twitter:title" content={socialTitle} />
       <meta name="twitter:description" content={socialDesc} />
       <meta name="twitter:image" content={socialImage} />
+      <meta name="twitter:image:alt" content={socialTitle} />
 
       {/* ── JSON-LD Structured Data (AEO) ────────────────────── */}
       {schemas.map((schema, i) => (

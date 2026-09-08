@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import SeoHead, { buildProductSchema, buildBreadcrumbSchema, buildProductFAQSchema } from '../components/SeoHead';
 import AIRecommendations from '../components/AIRecommendations';
-import { FaArrowLeft, FaWhatsapp, FaPhone, FaTimes, FaCheckCircle, FaShoppingCart, FaMinus, FaPlus, FaExchangeAlt, FaHeart, FaRegHeart, FaShareAlt } from 'react-icons/fa';
+import { FaArrowLeft, FaWhatsapp, FaPhone, FaTimes, FaCheckCircle, FaShoppingCart, FaMinus, FaPlus, FaExchangeAlt, FaHeart, FaRegHeart, FaShareAlt, FaFacebookF, FaTwitter, FaLinkedinIn, FaLink } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import api from '../api';
@@ -25,6 +25,7 @@ const ProductDetail = () => {
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 });
   const [qty, setQty] = useState(1);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
   const [quoteForm, setQuoteForm] = useState({
     name: '', hospitalName: '', phone: '', email: '', message: '', productName: ''
   });
@@ -37,13 +38,37 @@ const ProductDetail = () => {
   const { t, i18n } = useTranslation();
   const { setProductName } = useWhatsApp();
 
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const shareText = product ? `Check out ${product.name} on Meditrust Nepal` : '';
+
   const handleShare = async () => {
-    const url = window.location.href;
     if (navigator.share) {
-      try { await navigator.share({ title: product?.name, text: `Check out ${product?.name} on Meditrust Nepal`, url }); } catch {}
+      try { await navigator.share({ title: product?.name, text: shareText, url: shareUrl }); } catch {}
     } else {
-      await navigator.clipboard.writeText(url);
-      toast.success('Link copied to clipboard!', { autoClose: 1500 });
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!', { autoClose: 1500 });
+      } catch {
+        toast.error('Unable to copy link. Please copy the URL from your browser.');
+      }
+    }
+    setShowShareMenu(false);
+  };
+
+  const shareLinks = [
+    { label: 'Facebook', icon: FaFacebookF, className: 'bg-[#1877f2]', href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}` },
+    { label: 'WhatsApp', icon: FaWhatsapp, className: 'bg-[#25d366]', href: `https://wa.me/?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}` },
+    { label: 'X', icon: FaTwitter, className: 'bg-black', href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}` },
+    { label: 'LinkedIn', icon: FaLinkedinIn, className: 'bg-[#0a66c2]', href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}` },
+  ];
+
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('Product link copied!', { autoClose: 1500 });
+      setShowShareMenu(false);
+    } catch {
+      toast.error('Unable to copy link. Please copy the URL from your browser.');
     }
   };
 
@@ -183,7 +208,9 @@ const ProductDetail = () => {
     );
   }
 
-  const images = (product.allImages || (product.image ? [product.image] : [])).map(u => optimizeCloudinaryUrl(u, { width: 800 }));
+  const rawImages = product.allImages || (product.image ? [product.image] : []);
+  const images = rawImages.map(u => optimizeCloudinaryUrl(u, { width: 800 }));
+  const socialImage = optimizeCloudinaryUrl(rawImages[0], { width: 1200, height: 630 }) || undefined;
   const currentImage = images[selectedImage] || null;
 
   return (
@@ -191,10 +218,10 @@ const ProductDetail = () => {
       <SeoHead
         title={product.metaTitle || `${product.name} — Buy in Nepal`}
         description={product.metaDescription || product.description?.substring(0, 160) || `Buy ${product.name} from Meditrust Nepal. CE & ISO certified, competitive pricing, and 24/7 technical support across Nepal.`}
-        image={images[0] || undefined}
+        image={socialImage || images[0] || undefined}
         ogTitle={product.ogTitle || undefined}
         ogDesc={product.ogDesc || undefined}
-        ogImage={product.ogImage || undefined}
+        ogImage={product.ogImage || socialImage || undefined}
         type="product"
         keywords={product.metaKeywords || `${product.name}, ${product.category || 'medical equipment'} Nepal, buy ${product.name} Kathmandu, ${product.brand ? product.brand + ' Nepal' : 'medical equipment Nepal'}`}
         canonical={product.slug ? `/products/${product.slug}` : undefined}
@@ -415,13 +442,32 @@ const ProductDetail = () => {
                 >
                   {isWishlisted(product.slug) ? <FaHeart /> : <FaRegHeart />}
                 </button>
-                <button
-                  onClick={handleShare}
-                  className="border border-gray-300 px-4 py-3 rounded-lg font-semibold text-gray-500 hover:bg-gray-50 transition-all flex items-center gap-2"
-                  title="Share this product"
-                >
-                  <FaShareAlt />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowShareMenu(prev => !prev)}
+                    className="border border-gray-300 px-4 py-3 rounded-lg font-semibold text-gray-500 hover:bg-gray-50 transition-all flex items-center gap-2"
+                    title="Share this product"
+                    aria-label="Share this product"
+                    aria-expanded={showShareMenu}
+                  >
+                    <FaShareAlt />
+                  </button>
+                  {showShareMenu && (
+                    <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-xl">
+                      <button onClick={handleShare} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                        <FaShareAlt className="text-primary-600" /> Share from your device
+                      </button>
+                      {shareLinks.map(({ label, icon: Icon, className, href }) => (
+                        <a key={label} href={href} target="_blank" rel="noopener noreferrer" onClick={() => setShowShareMenu(false)} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                          <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs text-white ${className}`}><Icon /></span>{label}
+                        </a>
+                      ))}
+                      <button onClick={copyShareLink} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50">
+                        <FaLink className="text-gray-500" /> Copy product link
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Back in Stock alert — shown when out of stock */}
@@ -558,6 +604,46 @@ const ProductDetail = () => {
               </div>
             </div>
           )}
+
+          {/* Bottom share bar for direct product links */}
+          <div className="mt-12 border-t border-gray-200 py-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Share this product</h2>
+                <p className="mt-1 text-sm text-gray-500">Send this product page to your team or customers.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {shareLinks.map(({ label, icon: Icon, className, href }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Share on ${label}`}
+                    className={`flex h-10 w-10 items-center justify-center rounded-lg text-white transition-opacity hover:opacity-80 ${className}`}
+                  >
+                    <Icon />
+                  </a>
+                ))}
+                <button
+                  onClick={copyShareLink}
+                  aria-label="Copy product link"
+                  title="Copy product link"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 text-gray-600 transition-colors hover:bg-gray-50"
+                >
+                  <FaLink />
+                </button>
+                <button
+                  onClick={handleShare}
+                  aria-label="Share product from your device"
+                  title="Share from your device"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-primary-200 text-primary-600 transition-colors hover:bg-primary-50"
+                >
+                  <FaShareAlt />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
