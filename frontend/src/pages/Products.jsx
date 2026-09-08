@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import SeoHead, { buildBreadcrumbSchema, buildFAQSchema } from '../components/SeoHead';
-import { FaSearch, FaTh, FaList, FaArrowRight, FaShoppingCart, FaExchangeAlt, FaTimes, FaSort, FaCheck, FaChevronDown, FaChevronUp, FaHeart, FaRegHeart } from 'react-icons/fa';
+import { FaSearch, FaTh, FaList, FaArrowRight, FaShoppingCart, FaExchangeAlt, FaTimes, FaSort, FaCheck, FaChevronDown, FaChevronUp, FaHeart, FaRegHeart, FaShareAlt } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import api from '../api';
@@ -150,6 +150,29 @@ const Products = () => {
       { autoClose: 3000 }
     );
   }, [addToCart]);
+
+  const handleShareProduct = async (product) => {
+    const productUrl = `${window.location.origin}/products/${product.slug || product.id}`;
+    const shareData = {
+      title: product.name,
+      text: `Check out ${product.name} on Meditrust Nepal`,
+      url: productUrl,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch {}
+    }
+
+    try {
+      await navigator.clipboard.writeText(productUrl);
+      toast.success('Product link copied!', { autoClose: 1500 });
+    } catch {
+      toast.error('Unable to copy product link.');
+    }
+  };
 
   // Derive unique categories from products
   useEffect(() => {
@@ -676,6 +699,14 @@ const Products = () => {
                               <FaShoppingCart className="text-xs sm:text-sm" />
                             </button>
                             <button
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShareProduct(product); }}
+                              className="flex items-center justify-center px-2 sm:px-3 py-1.5 sm:py-2 bg-gray-100 text-gray-600 rounded-lg text-xs sm:text-sm font-medium hover:bg-gray-200 transition-colors"
+                              title="Share product"
+                              aria-label={`Share ${product.name}`}
+                            >
+                              <FaShareAlt className="text-xs sm:text-sm" />
+                            </button>
+                            <button
                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(product); }}
                               className={`flex items-center justify-center px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm transition-colors ${
                                 isWishlisted(product.slug) ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-400'
@@ -740,6 +771,15 @@ const Products = () => {
                               className="text-green-600 text-sm font-medium flex items-center hover:text-green-700"
                             >
                               <FaShoppingCart className="mr-1" /> {t('Add_To_Quote')}
+                            </button>
+                            <span className="text-gray-300">|</span>
+                            <button
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShareProduct(product); }}
+                              className="text-gray-600 text-sm font-medium flex items-center hover:text-gray-800"
+                              title="Share product"
+                              aria-label={`Share ${product.name}`}
+                            >
+                              <FaShareAlt className="mr-1" /> Share
                             </button>
                           </div>
                         </div>
