@@ -14,7 +14,7 @@ const escape = (str = '') =>
 
 const stripHtml = (html = '') => String(html).replace(/<[^>]*>/g, '').slice(0, 300);
 
-const shell = ({ title, description, canonical, image, schemas = [], body = '' }) => `<!DOCTYPE html>
+const shell = ({ title, description, canonical, image, ogTitle, ogDescription, ogType = 'website', schemas = [], body = '' }) => `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
@@ -25,17 +25,17 @@ const shell = ({ title, description, canonical, image, schemas = [], body = '' }
   <link rel="alternate" hreflang="en" href="${escape(canonical)}"/>
   <link rel="alternate" hreflang="ne" href="${escape(canonical)}"/>
   <link rel="alternate" hreflang="x-default" href="${escape(canonical)}"/>
-  <meta property="og:title" content="${escape(title)}"/>
-  <meta property="og:description" content="${escape(description)}"/>
+  <meta property="og:title" content="${escape(ogTitle || title)}"/>
+  <meta property="og:description" content="${escape(ogDescription || description)}"/>
   <meta property="og:url" content="${escape(canonical)}"/>
   <meta property="og:image" content="${escape(image || SITE + '/logo.png')}"/>
-  <meta property="og:type" content="website"/>
+  <meta property="og:type" content="${escape(ogType)}"/>
   <meta property="og:site_name" content="${SITE_NAME}"/>
   <meta property="og:locale" content="en_US"/>
   <meta property="og:locale:alternate" content="ne_NP"/>
   <meta name="twitter:card" content="summary_large_image"/>
-  <meta name="twitter:title" content="${escape(title)}"/>
-  <meta name="twitter:description" content="${escape(description)}"/>
+  <meta name="twitter:title" content="${escape(ogTitle || title)}"/>
+  <meta name="twitter:description" content="${escape(ogDescription || description)}"/>
   <meta name="twitter:image" content="${escape(image || SITE + '/logo.png')}"/>
   <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1"/>
   <meta name="geo.region" content="NP"/>
@@ -128,7 +128,7 @@ router.get('/render', async (req, res) => {
       const slug = product.slug || product._id;
       const canonical = `${SITE}/products/${slug}`;
       const images = (product.images || []).map(i => i.url || i.path || i).filter(s => typeof s === 'string' && s.startsWith('http'));
-      const image = images[0] || null;
+      const image = product.ogImage || images[0] || null;
       const desc = product.metaDescription || stripHtml(product.description) || `Buy ${product.name} from Meditrust Nepal. CE & ISO certified, competitive pricing, 24/7 support.`;
       const priceValidUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -190,6 +190,9 @@ ${product.brand ? `<p>Brand: ${escape(product.brand)}</p>` : ''}
         description: desc,
         canonical,
         image,
+        ogTitle: product.ogTitle || undefined,
+        ogDescription: product.ogDesc || product.metaDescription || undefined,
+        ogType: 'product',
         schemas: [productSchema, breadcrumb, faq],
         body,
       }));

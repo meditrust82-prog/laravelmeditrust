@@ -191,8 +191,10 @@ const ProductDetail = () => {
       <SeoHead
         title={product.metaTitle || `${product.name} — Buy in Nepal`}
         description={product.metaDescription || product.description?.substring(0, 160) || `Buy ${product.name} from Meditrust Nepal. CE & ISO certified, competitive pricing, and 24/7 technical support across Nepal.`}
-        image={images[0]?.path || undefined}
+        image={product.ogImage || images[0] || undefined}
         type="product"
+        ogTitle={product.ogTitle || undefined}
+        ogDescription={product.ogDesc || product.metaDescription || undefined}
         keywords={product.metaKeywords || `${product.name}, ${product.category || 'medical equipment'} Nepal, buy ${product.name} Kathmandu, ${product.brand ? product.brand + ' Nepal' : 'medical equipment Nepal'}`}
         canonical={product.slug ? `/products/${product.slug}` : undefined}
         schemas={[
@@ -337,9 +339,17 @@ const ProductDetail = () => {
                 </div>
                 <button
                   onClick={() => addToCart(product, qty)}
-                  className="flex-1 bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 min-w-0 bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 transition-all flex items-center justify-center gap-2"
                 >
                   <FaShoppingCart /> {t('Add_To_Cart_Label')}
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="shrink-0 border border-gray-300 dark:border-dark-border text-gray-700 dark:text-gray-200 px-4 py-3 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-dark-card transition-all flex items-center justify-center gap-2"
+                  title="Share this product"
+                  aria-label="Share this product"
+                >
+                  <FaShareAlt /> <span className="hidden sm:inline">Share</span>
                 </button>
               </div>
 
@@ -411,13 +421,6 @@ const ProductDetail = () => {
                   title={isWishlisted(product.slug) ? 'Remove from wishlist' : 'Save to wishlist'}
                 >
                   {isWishlisted(product.slug) ? <FaHeart /> : <FaRegHeart />}
-                </button>
-                <button
-                  onClick={handleShare}
-                  className="border border-gray-300 px-4 py-3 rounded-lg font-semibold text-gray-500 hover:bg-gray-50 transition-all flex items-center gap-2"
-                  title="Share this product"
-                >
-                  <FaShareAlt />
                 </button>
               </div>
 

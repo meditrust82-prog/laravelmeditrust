@@ -27,6 +27,8 @@ const SeoHead = ({
   keywords = DEFAULT_KEYWORDS,
   image = DEFAULT_IMAGE,
   type = 'website',
+  ogTitle,
+  ogDescription,
   schemas = [],
   noindex = false,
   canonical: canonicalProp,
@@ -37,6 +39,8 @@ const SeoHead = ({
   const canonical = canonicalRaw.startsWith('http') ? canonicalRaw : `${SITE_URL}${canonicalRaw}`;
   const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Medical Equipment Supplier Nepal`;
   const ogImage = image.startsWith('http') ? image : `${SITE_URL}${image}`;
+  const socialTitle = ogTitle || fullTitle;
+  const socialDescription = ogDescription || description;
 
   return (
     <Helmet>
@@ -56,8 +60,8 @@ const SeoHead = ({
 
       {/* ── Open Graph ───────────────────────────────────────── */}
       <meta property="og:type" content={type} />
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
+      <meta property="og:title" content={socialTitle} />
+      <meta property="og:description" content={socialDescription} />
       <meta property="og:url" content={canonical} />
       <meta property="og:image" content={ogImage} />
       <meta property="og:image:width" content="1200" />
@@ -68,8 +72,8 @@ const SeoHead = ({
 
       {/* ── Twitter Card ─────────────────────────────────────── */}
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
+      <meta name="twitter:title" content={socialTitle} />
+      <meta name="twitter:description" content={socialDescription} />
       <meta name="twitter:image" content={ogImage} />
 
       {/* ── JSON-LD Structured Data (AEO) ────────────────────── */}

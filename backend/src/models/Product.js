@@ -17,6 +17,9 @@ const productSchema = new mongoose.Schema(
     metaTitle: { type: String },
     metaDescription: { type: String },
     metaKeywords: { type: String },
+    ogTitle: { type: String },
+    ogDesc: { type: String },
+    ogImage: { type: String },
     badges: [{ type: String, trim: true }],
   },
   { timestamps: true }

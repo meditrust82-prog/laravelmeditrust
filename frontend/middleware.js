@@ -6,11 +6,14 @@ export const config = {
 
 const BOT_UA = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|whatsapp|telegrambot|applebot|gptbot|anthropic-ai|perplexitybot|claudebot|ccbot|chatgpt|google-extended|meta-externalagent/i;
 
-const BACKEND = 'https://medi-production-5b91.up.railway.app';
+const BACKEND = process.env.VITE_BACKEND_URL || process.env.BACKEND_URL || '';
 
 export default async function middleware(request) {
   const ua = request.headers.get('user-agent') || '';
   if (!BOT_UA.test(ua)) return;
+
+  // If no backend is configured or reachable, let standard Vercel static routing handle it
+  if (!BACKEND) return;
 
   const url = new URL(request.url);
   const path = url.pathname;
@@ -20,7 +23,7 @@ export default async function middleware(request) {
     const renderUrl = `${BACKEND}/render?path=${encodeURIComponent(path)}${category ? `&category=${encodeURIComponent(category)}` : ''}`;
     const res = await fetch(renderUrl, {
       headers: { 'x-prerender-token': 'internal' },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(3000),
     });
 
     if (!res.ok) return;

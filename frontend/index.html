@@ -10,11 +10,14 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon-512.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#103452" />
-    <title>Meditrust Nepal - Surgical &amp; Medical Equipment</title>
-    <meta name="description" content="Nepal's trusted supplier of surgical instruments, ICU equipment, patient monitors and more. CE &amp; ISO certified. Serving 200+ hospitals." />
+    <title>Meditrust Nepal - Surgical &amp; Medical Equipment Supplier Kathmandu</title>
+    <meta name="description" content="Nepal's trusted supplier of surgical instruments, ICU equipment, patient monitors, USG &amp; ECG machines. CE &amp; ISO certified. Serving 200+ hospitals across Nepal." />
     <!-- Open Graph fallback (react-helmet overrides per page) -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Meditrust Nepal" />
+    <meta property="og:title" content="Meditrust Nepal - Surgical &amp; Medical Equipment Supplier Kathmandu" />
+    <meta property="og:description" content="Nepal's trusted supplier of surgical instruments, ICU equipment, patient monitors, USG &amp; ECG machines. CE &amp; ISO certified." />
+    <meta property="og:url" content="https://meditrustnepal.com/" />
     <meta property="og:image" content="https://meditrustnepal.com/logo.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <!-- Geo -->
@@ -28,9 +31,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Meditrust" />
-    <!-- Google Search Console verification (replace content value with your token from GSC → Settings → Ownership verification → HTML tag) -->
+    <!-- Google Search Console verification -->
     <meta name="google-site-verification" content="REPLACE_WITH_GSC_VERIFICATION_TOKEN" />
-    <!-- Google Analytics (replace G-XXXXXXXXXX with your Measurement ID) -->
+    <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -38,17 +41,82 @@
       gtag('js', new Date());
       gtag('config', 'G-XXXXXXXXXX', { send_page_view: false });
     </script>
-    <!-- Backend prefetch -->
-    <link rel="dns-prefetch" href="https://medi-production-5b91.up.railway.app" />
-    <link rel="preconnect" href="https://medi-production-5b91.up.railway.app" crossorigin />
     <!-- Cloudinary prefetch for product images -->
     <link rel="dns-prefetch" href="https://res.cloudinary.com" />
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Structured Data (Schema.org) for Instant Googlebot Discovery -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "MedicalBusiness",
+          "@id": "https://meditrustnepal.com/#organization",
+          "name": "Meditrust Nepal",
+          "url": "https://meditrustnepal.com",
+          "logo": "https://meditrustnepal.com/logo.png",
+          "image": "https://meditrustnepal.com/logo.png",
+          "description": "Supplier of surgical instruments, ICU equipment, patient monitors, diagnostic devices, and hospital furniture in Nepal.",
+          "telephone": "+977-9818100515",
+          "email": "meditrust82@gmail.com",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Naxal, Bhagwati Bahal",
+            "addressLocality": "Kathmandu",
+            "postalCode": "44600",
+            "addressCountry": "NP"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 27.7172,
+            "longitude": 85.3240
+          },
+          "priceRange": "$$",
+          "openingHoursSpecification": [
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+              "opens": "09:00",
+              "closes": "18:00"
+            }
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://meditrustnepal.com/#website",
+          "url": "https://meditrustnepal.com",
+          "name": "Meditrust Nepal",
+          "publisher": {
+            "@id": "https://meditrustnepal.com/#organization"
+          },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://meditrustnepal.com/products?search={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
+    <noscript>
+      <header>
+        <h1>Meditrust Nepal - Surgical &amp; Medical Equipment Supplier in Nepal</h1>
+        <p>Nepal's trusted supplier of ICU equipment, patient monitors, surgical instruments, and diagnostic machines.</p>
+        <nav>
+          <a href="/products">View Medical Equipment Catalog</a> |
+          <a href="/about">About Us</a> |
+          <a href="/services">Services &amp; Maintenance</a> |
+          <a href="/contact">Contact Meditrust Nepal</a> |
+          <a href="/blog">Medical Equipment Guides</a>
+        </nav>
+      </header>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

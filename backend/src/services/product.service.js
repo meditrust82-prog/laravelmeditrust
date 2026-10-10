@@ -3,7 +3,7 @@ const Product = require('../models/Product');
 const { uploadToCloudinary } = require('../utils/cloudinary');
 
 const ALLOWED_SORT_FIELDS = new Set(['-createdAt', 'createdAt', '-price', 'price', '-name', 'name', '-updatedAt']);
-const ALLOWED_FIELDS = ['name', 'slug', 'description', 'specifications', 'price', 'originalPrice', 'cost', 'stock', 'category', 'brand', 'featured', 'images', 'metaTitle', 'metaDescription', 'metaKeywords', 'badges'];
+const ALLOWED_FIELDS = ['name', 'slug', 'description', 'specifications', 'price', 'originalPrice', 'cost', 'stock', 'category', 'brand', 'featured', 'images', 'metaTitle', 'metaDescription', 'metaKeywords', 'ogTitle', 'ogDesc', 'ogImage', 'badges'];
 const pick = (data) => Object.fromEntries(ALLOWED_FIELDS.filter(k => k in data).map(k => [k, data[k]]));
 
 // Strip internal fields and replace exact stock with an inStock boolean for public consumers.

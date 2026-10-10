@@ -5,13 +5,19 @@ Disallow: /api/
 Disallow: /cart
 Disallow: /compare
 Disallow: /track/
-Disallow: /render
 Disallow: /wishlist
 
-Sitemap: https://meditrustnepal.com/sitemap.xml
-LLMs: https://meditrustnepal.com/llms.txt
+# Crawlers
+User-agent: Googlebot
+Allow: /
 
-# AI crawlers
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# AI Crawlers & LLM Indexing
 User-agent: GPTBot
 Allow: /
 
@@ -20,3 +26,9 @@ Allow: /
 
 User-agent: PerplexityBot
 Allow: /
+
+User-agent: Applebot
+Allow: /
+
+Sitemap: https://meditrustnepal.com/sitemap.xml
+LLMs: https://meditrustnepal.com/llms.txt
