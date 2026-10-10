@@ -30,5 +30,5 @@ Allow: /
 User-agent: Applebot
 Allow: /
 
-Sitemap: https://meditrustnepal.com/sitemap.xml
-LLMs: https://meditrustnepal.com/llms.txt
+Sitemap: https://www.meditrustnepal.com/sitemap.xml
+LLMs: https://www.meditrustnepal.com/llms.txt
