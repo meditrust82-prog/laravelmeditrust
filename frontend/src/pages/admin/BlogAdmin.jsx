@@ -415,8 +415,9 @@ const BlogAdmin = () => {
       const res = await api.post('/blogs/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       field(key, res.data.url);
       toast.success('Image uploaded');
-    } catch {
-      toast.error('Upload failed');
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Upload failed';
+      toast.error(`Upload failed: ${msg}`);
     } finally {
       setUploading(false);
     }
@@ -425,10 +426,16 @@ const BlogAdmin = () => {
   // For content images inserted via the rich-text editor — returns the URL.
   const uploadContentImage = async (file) => {
     if (!file) return null;
-    const fd = new FormData();
-    fd.append('image', file);
-    const res = await api.post('/blogs/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-    return res.data.url;
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const res = await api.post('/blogs/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      return res.data.url;
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message || 'Content image upload failed';
+      toast.error(msg);
+      return null;
+    }
   };
 
   /* ── List actions ── */

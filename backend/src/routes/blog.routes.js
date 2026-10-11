@@ -1,6 +1,8 @@
 const router = require('express').Router();
 const Blog = require('../models/Blog');
 const { protect, adminOnly } = require('../middlewares/auth');
+const multerUpload = require('../utils/multer');
+const { uploadToCloudinary } = require('../utils/cloudinary');
 
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -26,6 +28,31 @@ router.get('/all', protect, adminOnly, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// POST /api/v1/blogs/upload — admin media/image upload
+router.post('/upload', protect, adminOnly, (req, res, next) => {
+  multerUpload.any()(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Image upload error' });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const file = req.files?.[0] || req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+    const uploaded = await uploadToCloudinary([file]);
+    const url = uploaded[0]?.url || uploaded[0]?.path;
+    if (!url) {
+      return res.status(500).json({ error: 'Failed to upload image to Cloudinary' });
+    }
+    res.json({ url, secure_url: url });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Image upload failed' });
+  }
+});
+
 // GET /api/v1/blogs/:slug  — public
 router.get('/:slug', async (req, res) => {
   try {
@@ -38,10 +65,10 @@ router.get('/:slug', async (req, res) => {
 // POST /api/v1/blogs  — admin
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const { title, excerpt, content, image, author, category, tags, published, metaTitle, metaDesc } = req.body;
-    if (!title) return res.status(400).json({ error: 'Title is required' });
-    const slug = slugify(title);
-    const blog = await Blog.create({ title, slug, excerpt, content, image, author, category, tags, published, metaTitle, metaDesc });
+    const data = { ...req.body };
+    if (!data.title) return res.status(400).json({ error: 'Title is required' });
+    data.slug = data.slug || slugify(data.title);
+    const blog = await Blog.create(data);
     res.status(201).json(blog);
   } catch (err) {
     if (err.code === 11000) return res.status(400).json({ error: 'A post with this title already exists' });
@@ -52,10 +79,11 @@ router.post('/', protect, adminOnly, async (req, res) => {
 // PUT /api/v1/blogs/:id  — admin
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
-    const { title, excerpt, content, image, author, category, tags, published, metaTitle, metaDesc } = req.body;
-    const update = { excerpt, content, image, author, category, tags, published, metaTitle, metaDesc };
-    if (title) { update.title = title; update.slug = slugify(title); }
-    const blog = await Blog.findByIdAndUpdate(req.params.id, update, { new: true });
+    const data = { ...req.body };
+    if (data.title && !data.slug) {
+      data.slug = slugify(data.title);
+    }
+    const blog = await Blog.findByIdAndUpdate(req.params.id, data, { new: true, runValidators: true });
     if (!blog) return res.status(404).json({ error: 'Post not found' });
     res.json(blog);
   } catch (err) { res.status(500).json({ error: err.message }); }

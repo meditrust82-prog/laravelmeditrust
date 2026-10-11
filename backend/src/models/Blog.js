@@ -11,8 +11,7 @@ const blogSchema = new mongoose.Schema({
   tags:        [{ type: String }],
   published:   { type: Boolean, default: true },
   metaTitle:   { type: String },
-  metaDesc:    { type: String },
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 blogSchema.index({ slug: 1 });
 blogSchema.index({ published: 1, createdAt: -1 });
