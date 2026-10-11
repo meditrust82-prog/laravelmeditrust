@@ -14,31 +14,33 @@ const nowNepal = () =>
   });
 
 const DEFAULT_BOT_TOKEN = '7989226843:AAEw6t_QlIjwHQ8Y5DL7ETdjRj83xo0T-I0';
-const DEFAULT_CHAT_ID = '8746818071';
+const DEFAULT_CHAT_IDS = ['8746818071'];
 
 /**
- * Returns current Telegram credentials from environment variables,
- * falling back to default bot credentials if not explicitly set.
- * Evaluated on each call so updating env vars immediately switches the active bot.
+ * Returns current Telegram credentials from environment variables.
+ * Supports multiple chat IDs separated by comma or space:
+ * e.g. TELEGRAM_CHAT_ID="8746818071, 9876543210" or TELEGRAM_CHAT_IDS="8746818071, 9876543210"
+ * Evaluated on each call so updating env vars immediately switches the active bots/chats.
  */
-const getTelegramConfig = () => ({
-  token: (process.env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN).trim(),
-  chatId: (process.env.TELEGRAM_CHAT_ID || DEFAULT_CHAT_ID).trim(),
-});
+const getTelegramConfig = () => {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN).trim();
+  const rawChatIds = (process.env.TELEGRAM_CHAT_ID || process.env.TELEGRAM_CHAT_IDS || '').trim();
+
+  const chatIds = rawChatIds
+    ? rawChatIds.split(/[\s,;]+/).map((id) => id.trim()).filter(Boolean)
+    : DEFAULT_CHAT_IDS;
+
+  return {
+    token,
+    chatIds,
+    chatId: chatIds[0] || '',
+  };
+};
 
 /**
- * Sends an HTML message to the configured Telegram chat.
- * Respects TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars when defined,
- * or default verified bot credentials as fallback.
+ * Helper to dispatch message to a single Telegram chat ID.
  */
-const sendTelegram = (text) => {
-  const { token, chatId } = getTelegramConfig();
-
-  if (!token || !chatId) {
-    console.warn('[Telegram] Telegram token or Chat ID is not configured');
-    return Promise.resolve(false);
-  }
-
+const sendMessageToChat = (token, chatId, text) => {
   const payload = JSON.stringify({
     chat_id: chatId,
     text,
@@ -65,7 +67,7 @@ const sendTelegram = (text) => {
           if (res.statusCode >= 200 && res.statusCode < 300) {
             resolve(true);
           } else {
-            console.warn(`[Telegram] HTTP ${res.statusCode}: ${resData}`);
+            console.warn(`[Telegram] HTTP ${res.statusCode} for chat ${chatId}: ${resData}`);
             resolve(false);
           }
         });
@@ -74,18 +76,37 @@ const sendTelegram = (text) => {
 
     req.on('timeout', () => {
       req.destroy();
-      console.warn('[Telegram] Request timeout');
+      console.warn(`[Telegram] Request timeout for chat ${chatId}`);
       resolve(false);
     });
 
     req.on('error', (err) => {
-      console.warn('[Telegram] Network error:', err.message);
+      console.warn(`[Telegram] Network error for chat ${chatId}:`, err.message);
       resolve(false);
     });
 
     req.write(payload);
     req.end();
   });
+};
+
+/**
+ * Sends an HTML message to all configured Telegram chat IDs.
+ * Broadcasts in parallel to each chat ID.
+ */
+const sendTelegram = async (text) => {
+  const { token, chatIds } = getTelegramConfig();
+
+  if (!token || !chatIds || chatIds.length === 0) {
+    console.warn('[Telegram] Telegram token or Chat ID is not configured');
+    return false;
+  }
+
+  const results = await Promise.allSettled(
+    chatIds.map((chatId) => sendMessageToChat(token, chatId, text))
+  );
+
+  return results.some((r) => r.status === 'fulfilled' && r.value === true);
 };
 
 /**

@@ -67,9 +67,9 @@ router.post('/quote', async (req, res) => {
 
 // POST /api/v1/notify/test-telegram  — admin only test ping
 router.post('/test-telegram', protect, adminOnly, async (req, res) => {
-  const { token, chatId } = getTelegramConfig();
+  const { token, chatIds } = getTelegramConfig();
 
-  if (!token || !chatId) {
+  if (!token || !chatIds || chatIds.length === 0) {
     return res.status(400).json({
       ok: false,
       error: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing from environment variables and no fallback exists',
@@ -77,15 +77,15 @@ router.post('/test-telegram', protect, adminOnly, async (req, res) => {
   }
 
   const success = await sendTelegram(
-    `🔔 <b>Meditrust Nepal Test Ping</b>\nBot connection verified successfully!\n🕒 <i>${new Date().toISOString()}</i>`
+    `🔔 <b>Meditrust Nepal Test Ping</b>\nBot connection verified successfully for ${chatIds.length} chat(s)!\n🕒 <i>${new Date().toISOString()}</i>`
   );
 
   if (success) {
-    res.json({ ok: true, message: 'Test message sent to Telegram successfully' });
+    res.json({ ok: true, message: `Test message sent to ${chatIds.length} Telegram chat(s) successfully`, chatCount: chatIds.length });
   } else {
     res.status(502).json({
       ok: false,
-      error: 'Failed to deliver message to Telegram. Check bot token and chat ID.',
+      error: 'Failed to deliver message to Telegram. Check bot token and chat ID(s).',
     });
   }
 });
