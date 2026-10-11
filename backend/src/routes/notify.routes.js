@@ -65,4 +65,30 @@ router.post('/quote', async (req, res) => {
   }
 });
 
+// POST /api/v1/notify/test-telegram  — admin only test ping
+router.post('/test-telegram', protect, adminOnly, async (req, res) => {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const chatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
+
+  if (!token || !chatId) {
+    return res.status(400).json({
+      ok: false,
+      error: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing from environment variables',
+    });
+  }
+
+  const success = await sendTelegram(
+    `🔔 <b>Meditrust Nepal Test Ping</b>\nBot connection verified successfully!\n🕒 <i>${new Date().toISOString()}</i>`
+  );
+
+  if (success) {
+    res.json({ ok: true, message: 'Test message sent to Telegram successfully' });
+  } else {
+    res.status(502).json({
+      ok: false,
+      error: 'Failed to deliver message to Telegram. Check bot token and chat ID.',
+    });
+  }
+});
+
 module.exports = { router, sendTelegram };

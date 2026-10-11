@@ -1,8 +1,5 @@
 const https = require('https');
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '7989226843:AAEw6t_QlIjwHQ8Y5DL7ETdjRj83xo0T-I0';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '8746818071';
-
 const escapeHtml = (str = '') =>
   String(str || '')
     .replace(/&/g, '&amp;')
@@ -17,17 +14,28 @@ const nowNepal = () =>
   });
 
 /**
+ * Returns current Telegram credentials from environment variables.
+ * Evaluated on each call so updating env vars immediately switches the active bot.
+ */
+const getTelegramConfig = () => ({
+  token: (process.env.TELEGRAM_BOT_TOKEN || '').trim(),
+  chatId: (process.env.TELEGRAM_CHAT_ID || '').trim(),
+});
+
+/**
  * Sends an HTML message to the configured Telegram chat.
- * Fails safely without throwing errors that interrupt the main API request.
+ * Strictly driven by TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars.
  */
 const sendTelegram = (text) => {
-  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
-    console.warn('[Telegram] Token or Chat ID missing');
+  const { token, chatId } = getTelegramConfig();
+
+  if (!token || !chatId) {
+    console.warn('[Telegram] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set in environment variables');
     return Promise.resolve(false);
   }
 
   const payload = JSON.stringify({
-    chat_id: TELEGRAM_CHAT_ID,
+    chat_id: chatId,
     text,
     parse_mode: 'HTML',
     disable_web_page_preview: true,
@@ -37,7 +45,7 @@ const sendTelegram = (text) => {
     const req = https.request(
       {
         hostname: 'api.telegram.org',
-        path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+        path: `/bot${token}/sendMessage`,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
