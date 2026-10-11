@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { listOrders, transitionOrder, audit } = require('../services/order.service');
+const { notifyOrder } = require('../utils/telegram');
 
 const VALID_GATEWAYS = new Set(['khalti']);
 // Payment window: 30 min — matches expireStalePayments default
@@ -98,6 +99,16 @@ const createOrder = async (req, res, next) => {
       totalPrice,
       status: initialStatus,
       gateway: useGateway,
+    });
+    notifyOrder({
+      orderId: order._id,
+      user: req.user,
+      items: resolvedItems,
+      totalPrice,
+      shippingAddress,
+      notes,
+    }).catch((err) => {
+      console.warn('[Telegram Order Notify]', err.message);
     });
     res.status(201).json(order);
   } catch (err) {

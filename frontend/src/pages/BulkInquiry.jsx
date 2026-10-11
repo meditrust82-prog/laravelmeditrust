@@ -3,6 +3,7 @@ import SeoHead from '../components/SeoHead';
 import { FaPlus, FaTrash, FaWhatsapp, FaArrowLeft } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import api from '../api';
 
 const emptyRow = () => ({ id: Date.now() + Math.random(), name: '', qty: 1, notes: '' });
 
@@ -41,6 +42,19 @@ const BulkInquiry = () => {
     e.preventDefault();
     if (!contact.name || !contact.phone) { toast.error('Please fill in your name and phone number'); return; }
     if (filledItems.length === 0) { toast.error('Please add at least one item'); return; }
+
+    const summary = filledItems.map(r => `${r.name} (Qty: ${r.qty}${r.notes ? `, ${r.notes}` : ''})`).join('; ');
+    api.post('/quotes', {
+      productName: `Bulk Inquiry (${filledItems.length} items)`,
+      name: contact.name,
+      hospitalName: contact.hospital,
+      phone: contact.phone,
+      email: contact.email,
+      message: summary,
+      qty: filledItems.reduce((acc, cur) => acc + (Number(cur.qty) || 1), 0),
+      source: 'Bulk Inquiry Page',
+    }).catch(() => {});
+
     window.open(`https://wa.me/9779818100515?text=${buildWAMessage()}`, '_blank');
     setSubmitted(true);
   };

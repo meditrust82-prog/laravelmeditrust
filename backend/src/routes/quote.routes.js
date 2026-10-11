@@ -2,6 +2,7 @@ const router = require('express').Router();
 const Quote = require('../models/Quote');
 const { protect, adminOnly } = require('../middlewares/auth');
 const rateLimit = require('express-rate-limit');
+const { notifyQuote } = require('../utils/telegram');
 
 const quoteLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -17,6 +18,9 @@ router.post('/', quoteLimiter, async (req, res, next) => {
     const { productName, productSlug, name, hospitalName, phone, email, message, qty, source } = req.body;
     if (!productName || !name || !phone) return res.status(400).json({ error: 'productName, name and phone are required' });
     const quote = await Quote.create({ productName, productSlug, name, hospitalName, phone, email, message, qty, source });
+    notifyQuote({ productName, productSlug, name, hospitalName, phone, email, message, qty, source }).catch((err) => {
+      console.warn('[Telegram Quote Notify]', err.message);
+    });
     res.status(201).json({ ok: true, quoteId: quote._id });
   } catch (err) { next(err); }
 });
