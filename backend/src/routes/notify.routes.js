@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const Subscriber = require('../models/Subscriber');
 const { protect, adminOnly } = require('../middlewares/auth');
-const { sendTelegram, notifySubscriber, notifyQuote } = require('../utils/telegram');
+const { sendTelegram, notifySubscriber, notifyQuote, getTelegramConfig } = require('../utils/telegram');
 
 // POST /api/v1/notify/newsletter  — public
 router.post('/newsletter', async (req, res) => {
@@ -67,13 +67,12 @@ router.post('/quote', async (req, res) => {
 
 // POST /api/v1/notify/test-telegram  — admin only test ping
 router.post('/test-telegram', protect, adminOnly, async (req, res) => {
-  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
-  const chatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
+  const { token, chatId } = getTelegramConfig();
 
   if (!token || !chatId) {
     return res.status(400).json({
       ok: false,
-      error: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing from environment variables',
+      error: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing from environment variables and no fallback exists',
     });
   }
 

@@ -15,8 +15,9 @@ const quoteLimiter = rateLimit({
 // ── Public: create a quote lead ─────────────────────────────────
 router.post('/', quoteLimiter, async (req, res, next) => {
   try {
-    const { productName, productSlug, name, hospitalName, phone, email, message, qty, source } = req.body;
-    if (!productName || !name || !phone) return res.status(400).json({ error: 'productName, name and phone are required' });
+    let { productName, productSlug, name, hospitalName, phone, email, message, qty, source } = req.body;
+    productName = (productName || 'General Inquiry').trim();
+    if (!name || !phone) return res.status(400).json({ error: 'name and phone are required' });
     const quote = await Quote.create({ productName, productSlug, name, hospitalName, phone, email, message, qty, source });
     notifyQuote({ productName, productSlug, name, hospitalName, phone, email, message, qty, source }).catch((err) => {
       console.warn('[Telegram Quote Notify]', err.message);

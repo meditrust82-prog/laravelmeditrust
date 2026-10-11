@@ -13,24 +13,29 @@ const nowNepal = () =>
     timeStyle: 'short',
   });
 
+const DEFAULT_BOT_TOKEN = '7989226843:AAEw6t_QlIjwHQ8Y5DL7ETdjRj83xo0T-I0';
+const DEFAULT_CHAT_ID = '8746818071';
+
 /**
- * Returns current Telegram credentials from environment variables.
+ * Returns current Telegram credentials from environment variables,
+ * falling back to default bot credentials if not explicitly set.
  * Evaluated on each call so updating env vars immediately switches the active bot.
  */
 const getTelegramConfig = () => ({
-  token: (process.env.TELEGRAM_BOT_TOKEN || '').trim(),
-  chatId: (process.env.TELEGRAM_CHAT_ID || '').trim(),
+  token: (process.env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN).trim(),
+  chatId: (process.env.TELEGRAM_CHAT_ID || DEFAULT_CHAT_ID).trim(),
 });
 
 /**
  * Sends an HTML message to the configured Telegram chat.
- * Strictly driven by TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars.
+ * Respects TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars when defined,
+ * or default verified bot credentials as fallback.
  */
 const sendTelegram = (text) => {
   const { token, chatId } = getTelegramConfig();
 
   if (!token || !chatId) {
-    console.warn('[Telegram] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set in environment variables');
+    console.warn('[Telegram] Telegram token or Chat ID is not configured');
     return Promise.resolve(false);
   }
 
@@ -103,19 +108,22 @@ const notifySubscriber = async ({ name, phone, email, source }) => {
 };
 
 /**
- * 2. Quote Request notification
+ * 2. Quote Request / Contact Inquiry notification
  */
 const notifyQuote = async ({ productName, productSlug, qty, name, hospitalName, phone, email, message, source }) => {
+  const isContact = source === 'contact_form' || !productSlug;
+  const header = isContact ? `📩 <b>NEW CONTACT / GENERAL INQUIRY</b>` : `🏥 <b>NEW QUOTE REQUEST</b>`;
+
   const messageText = [
-    `🏥 <b>NEW QUOTE REQUEST</b>`,
+    header,
     `━━━━━━━━━━━━━━━━━━`,
-    `📦 <b>Product:</b> ${escapeHtml(productName || 'General Inquiry')}`,
+    `📦 <b>Product / Subject:</b> ${escapeHtml(productName || 'General Inquiry')}`,
     qty ? `🔢 <b>Quantity:</b> ${qty}` : null,
     `👤 <b>Contact:</b> ${escapeHtml(name)}`,
     hospitalName ? `🏥 <b>Hospital / Clinic:</b> ${escapeHtml(hospitalName)}` : null,
     `📞 <b>Phone:</b> <code>${escapeHtml(phone)}</code>`,
     email ? `📧 <b>Email:</b> ${escapeHtml(email)}` : null,
-    message ? `💬 <b>Requirement:</b> <i>${escapeHtml(message)}</i>` : null,
+    message ? `💬 <b>Requirement / Message:</b>\n<i>${escapeHtml(message)}</i>` : null,
     `🌐 <b>Source:</b> ${escapeHtml(source || 'Website')}`,
     `🕒 <b>Time:</b> ${nowNepal()}`,
     ``,
@@ -178,6 +186,7 @@ const notifyOrder = async ({ orderId, user, items, totalPrice, shippingAddress, 
 };
 
 module.exports = {
+  getTelegramConfig,
   sendTelegram,
   notifySubscriber,
   notifyQuote,
